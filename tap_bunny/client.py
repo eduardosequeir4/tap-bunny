@@ -109,15 +109,90 @@ class BunnyStream(GraphQLStream):
         Args:
             response: The HTTP ``requests.Response`` object.
 
+        Raises:
+            RuntimeError: If the GraphQL response contains errors or invalid data.
+
         Yields:
             Each record from the source.
         """
-        resp_json = response.json(parse_float=decimal.Decimal)
-        if "errors" in resp_json:
+        # First check the response status code, even though GraphQL often returns 200
+        if response.status_code != 200:
             raise RuntimeError(
-                f"GraphQL query failed: {resp_json['errors']}"
+                f"HTTP request failed with status code {response.status_code}:\n"
+                f"Response: {response.text}"
             )
-        yield from resp_json.get("data", {}).get(self.name, [])
+
+        try:
+            resp_json = response.json(parse_float=decimal.Decimal)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to parse JSON response: {str(e)}\n"
+                f"Response text: {response.text[:1000]}"  # Include first 1000 chars of response
+            ) from e
+
+        # Check for GraphQL errors
+        if "errors" in resp_json:
+            errors = resp_json["errors"]
+            error_messages = []
+            
+            for error in errors:
+                message = error.get("message", "Unknown error")
+                path = ".".join(str(p) for p in error.get("path", []))
+                locations = error.get("locations", [])
+                extensions = error.get("extensions", {})
+                
+                error_detail = [
+                    f"Message: {message}",
+                    f"Path: {path}" if path else None,
+                    f"Locations: {locations}" if locations else None,
+                    f"Extensions: {extensions}" if extensions else None,
+                ]
+                error_messages.append(
+                    "\n".join(detail for detail in error_detail if detail is not None)
+                )
+
+            query_info = f"\nQuery: {self.query}" if hasattr(self, "query") else ""
+            variables_info = f"\nVariables: {self.vars}" if hasattr(self, "vars") else ""
+            
+            raise RuntimeError(
+                "GraphQL query failed for stream '{self.name}':"
+                f"{query_info}"
+                f"{variables_info}\n\n"
+                "Errors:\n" + "\n\n".join(error_messages)
+            )
+
+        # Validate response structure
+        if not isinstance(resp_json, dict):
+            raise RuntimeError(
+                f"Invalid GraphQL response structure. Expected dict, got {type(resp_json)}\n"
+                f"Response: {resp_json}"
+            )
+
+        data = resp_json.get("data")
+        if data is None:
+            raise RuntimeError(
+                f"GraphQL response data is null for stream '{self.name}'\n"
+                f"Response: {resp_json}"
+            )
+            
+        stream_data = data.get(self.name)
+        if stream_data is None:
+            raise RuntimeError(
+                f"No data found for stream '{self.name}' in response\n"
+                f"Available fields: {list(data.keys())}\n"
+                f"Response: {data}"
+            )
+            
+        if isinstance(stream_data, dict) and "nodes" in stream_data:
+            nodes = stream_data.get("nodes")
+            if nodes is None:
+                raise RuntimeError(
+                    f"Stream '{self.name}' has null nodes array\n"
+                    f"Response: {stream_data}"
+                )
+            yield from nodes
+        else:
+            yield from [stream_data] if stream_data else []
 
     def post_process(
         self,
