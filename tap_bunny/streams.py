@@ -7,9 +7,9 @@ from importlib import resources
 from typing import Any, Dict, Optional
 
 from singer_sdk import typing as th  # JSON Schema typing helpers
-from singer_sdk.helpers.jsonpath import extract_jsonpath
+
 import requests
-import decimal
+
 
 from tap_bunny.client import BunnyStream
 
@@ -29,6 +29,7 @@ class UsersStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "modified"
+    records_jsonpath = "$.data.users.edges[*].node"
     query = """
         users(first: 100, after: $after) {
             edges {
@@ -57,9 +58,6 @@ class UsersStream(BunnyStream):
             params["after"] = next_page_token
         return params
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.users.edges[*].node", response.json())
 
     def get_next_page_token(
         self,
@@ -80,6 +78,7 @@ class GroupsStream(BunnyStream):
 
     name = "groups"
     path = "/graphql"
+    records_jsonpath = "$.data.groups.edges[*].node"
     schema = th.PropertiesList(
         th.Property("name", th.StringType),
         th.Property("id", th.StringType),
@@ -88,6 +87,7 @@ class GroupsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "modified"
     query = """
+        query getAllGroups ($after: String, $before: String, $first: Int, $last: Int, $filter: String, $viewId: ID, $sort: String){
         groups(first: 100, after: $after) {
             edges {
                 cursor
@@ -100,6 +100,7 @@ class GroupsStream(BunnyStream):
             pageInfo {
                 hasNextPage
                 endCursor
+                }
             }
         }
         """
@@ -115,9 +116,6 @@ class GroupsStream(BunnyStream):
             params["after"] = next_page_token
         return params
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.groups.edges[*].node", response.json())
 
     def get_next_page_token(
         self,
@@ -138,6 +136,7 @@ class AccountsStream(BunnyStream):
 
     name = "accounts"
     path = "/graphql"
+    records_jsonpath = "$.data.accounts.edges[*].node"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountTypeId", th.StringType),
@@ -255,26 +254,7 @@ class AccountsStream(BunnyStream):
         }
         """
 
-    def get_graphql_variables(self, next_page_token: Optional[Any] = None) -> Dict[str, Any]:
-        """Return the variables for the GraphQL query."""
-        variables = {
-            "first": 100,
-            "after": next_page_token if next_page_token else "null",
-        }
-        return variables
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result records."""
-        resp_json = response.json(parse_float=decimal.Decimal)
-        if "errors" in resp_json:
-            raise RuntimeError(
-                f"GraphQL query failed: {resp_json['errors']}"
-            )
-        
-        # Extract accounts from the nested structure
-        accounts = resp_json.get("data", {}).get("accounts", {}).get("edges", [])
-        for edge in accounts:
-            yield edge.get("node", {})
 
     def get_next_page_token(
         self,
@@ -295,6 +275,7 @@ class SubscriptionsStream(BunnyStream):
 
     name = "subscriptions"
     path = "/graphql"
+    records_jsonpath = "$.data.subscriptions.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -318,32 +299,34 @@ class SubscriptionsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        subscriptions(first: 100, after: $after) {
-            nodes {
-                id
-                accountId
-                name
-                period
-                evergreen
-                state
-                currencyId
-                priceListId
-                provisioningRequired
-                rampIntervalMonths
-                startDate
-                endDate
-                trialStartDate
-                trialEndDate
-                trialPeriod
-                cancellationDate
-                createdAt
-                updatedAt
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllSubscriptions ($after: String){
+            subscriptions(first: 100, after: $after) {
+                nodes {
+                    id
+                    accountId
+                    name
+                    period
+                    evergreen
+                    state
+                    currencyId
+                    priceListId
+                    provisioningRequired
+                    rampIntervalMonths
+                    startDate
+                    endDate
+                    trialStartDate
+                    trialEndDate
+                    trialPeriod
+                    cancellationDate
+                    createdAt
+                    updatedAt
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -359,9 +342,6 @@ class SubscriptionsStream(BunnyStream):
             params["after"] = next_page_token
         return params
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.subscriptions.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -381,6 +361,7 @@ class AccountBalancesStream(BunnyStream):
 
     name = "account_balances"
     path = "/graphql"
+    records_jsonpath = "$.data.accountBalances.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -389,18 +370,20 @@ class AccountBalancesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     query = """
-        accountBalances(first: 100, after: $after) {
-            nodes {
-                id
-                accountId
-                balance
-                currencyId
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query accountBalances($after: String) {
+            accountBalances(first: 100, after: $after) {
+                nodes {
+                    id
+                    accountId
+                    balance
+                    currencyId
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -416,9 +399,6 @@ class AccountBalancesStream(BunnyStream):
             params["after"] = next_page_token
         return params
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.accountBalances.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -438,6 +418,7 @@ class EntitiesStream(BunnyStream):
 
     name = "entities"
     path = "/graphql"
+    records_jsonpath = "$.data.entities.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("abbreviation", th.StringType),
@@ -479,50 +460,52 @@ class EntitiesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        entities(first: 100, after: $after) {
-            nodes {
-                id
-                abbreviation
-                accentColor
-                baseCurrencyId
-                billingCity
-                billingCountry
-                billingState
-                billingStreet
-                billingZip
-                brandColor
-                createdAt
-                customerServiceEmail
-                emailSenderName
-                emailTemplate
-                fax
-                fiscalYearStartMonth
-                invoiceNumberPrefix
-                invoiceNumberSeq
-                invoicesImageUrl
-                isDefault
-                name
-                phone
-                privacyUrl
-                quoteNumberPrefix
-                quoteNumberSeq
-                quotesImageUrl
-                refundPolicyUrl
-                taxId
-                taxType
-                termsUrl
-                timezone
-                topNavImageUrl
-                tzIdentifier
-                tzOffset
-                updatedAt
-                website
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllEntities ($after: String){
+                entities(first: 100, after: $after) {
+                    nodes {
+                        id
+                    abbreviation
+                    accentColor
+                    baseCurrencyId
+                    billingCity
+                    billingCountry
+                    billingState
+                    billingStreet
+                    billingZip
+                    brandColor
+                    createdAt
+                    customerServiceEmail
+                    emailSenderName
+                    emailTemplate
+                    fax
+                    fiscalYearStartMonth
+                    invoiceNumberPrefix
+                    invoiceNumberSeq
+                    invoicesImageUrl
+                    isDefault
+                    name
+                    phone
+                    privacyUrl
+                    quoteNumberPrefix
+                    quoteNumberSeq
+                    quotesImageUrl
+                    refundPolicyUrl
+                    taxId
+                    taxType
+                    termsUrl
+                    timezone
+                    topNavImageUrl
+                    tzIdentifier
+                    tzOffset
+                    updatedAt
+                    website
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -537,10 +520,6 @@ class EntitiesStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.entities.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -560,6 +539,7 @@ class InvoicesStream(BunnyStream):
 
     name = "invoices"
     path = "/graphql"
+    records_jsonpath = "$.data.invoices.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -591,40 +571,42 @@ class InvoicesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        invoices(first: 100, after: $after) {
-            nodes {
-                id
-                accountId
-                amount
-                amountDue
-                amountPaid
-                createdAt
-                credits
-                currencyId
-                description
-                dueAt
-                issuedAt
-                kind
-                netPaymentDays
-                number
-                paidAt
-                payableId
-                poNumber
-                portalUrl
-                quoteId
-                smallUnitAmountDue
-                state
-                subtotal
-                taxAmount
-                updatedAt
-                url
-                uuid
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllInvoices ($after: String){
+            invoices(first: 100, after: $after) {
+                nodes {
+                    id
+                    accountId
+                    amount
+                    amountDue
+                    amountPaid
+                    createdAt
+                    credits
+                    currencyId
+                    description
+                    dueAt
+                    issuedAt
+                    kind
+                    netPaymentDays
+                    number
+                    paidAt
+                    payableId
+                    poNumber
+                    portalUrl
+                    quoteId
+                    smallUnitAmountDue
+                    state
+                    subtotal
+                    taxAmount
+                    updatedAt
+                    url
+                    uuid
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -640,9 +622,6 @@ class InvoicesStream(BunnyStream):
             params["after"] = next_page_token
         return params
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.invoices.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -662,6 +641,7 @@ class InvoiceItemsStream(BunnyStream):
 
     name = "invoice_items"
     path = "/graphql"
+    records_jsonpath = "$.data.invoiceItems.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("amount", th.NumberType),
@@ -670,12 +650,11 @@ class InvoiceItemsStream(BunnyStream):
         th.Property("currencyId", th.StringType),
         th.Property("discount", th.NumberType),
         th.Property("invoiceId", th.StringType),
-        th.Property("kind", th.StringType),
+        th.Property("isCoupon", th.BooleanType),
+        th.Property("isCredit", th.BooleanType),
         th.Property("lineText", th.StringType),
         th.Property("position", th.IntegerType),
         th.Property("price", th.NumberType),
-        th.Property("priceDecimals", th.IntegerType),
-        th.Property("prorationRate", th.NumberType),
         th.Property("quantity", th.NumberType),
         th.Property("subtotal", th.NumberType),
         th.Property("taxAmount", th.NumberType),
@@ -684,32 +663,32 @@ class InvoiceItemsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     query = """
-        invoiceItems(first: 100, after: $after) {
-            nodes {
-                id
-                amount
-                chargeType
-                couponId
-                currencyId
-                discount
-                invoiceId
-                kind
-                lineText
-                position
-                price
-                priceDecimals
-                prorationRate
-                quantity
-                subtotal
-                taxAmount
-                taxCode
-                vatCode
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllInvoiceItems ($after: String){
+            invoiceItems(first: 100, after: $after) {
+                nodes {
+                    id
+                    amount
+                    chargeType
+                    couponId
+                    discount
+                    invoiceId
+                    isCoupon
+                    isCredit
+                    lineText
+                    position
+                    price
+                    quantity
+                    subtotal
+                    taxAmount
+                    taxCode
+                    vatCode
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -724,10 +703,6 @@ class InvoiceItemsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.invoiceItems.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -747,6 +722,7 @@ class PaymentsStream(BunnyStream):
 
     name = "payments"
     path = "/graphql"
+    records_jsonpath = "$.data.payments.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -766,9 +742,10 @@ class PaymentsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        payments(first: 100, after: $after) {
-            nodes {
-                id
+        query getAllPayments ($after: String){
+            payments(first: 100, after: $after) {
+                nodes {
+                    id
                 accountId
                 amount
                 amountUnapplied
@@ -790,6 +767,7 @@ class PaymentsStream(BunnyStream):
                 hasPreviousPage
             }
         }
+    }
     """
 
     def get_url_params(
@@ -802,10 +780,6 @@ class PaymentsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.payments.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -841,9 +815,10 @@ class PaymentMethodsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        paymentMethods(first: 100, after: $after) {
-            nodes {
-                id
+        query getAllPaymentMethods ($after: String){
+            paymentMethods(first: 100, after: $after) {
+                nodes {
+                    id
                 accountId
                 createdAt
                 disabled
@@ -856,10 +831,11 @@ class PaymentMethodsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -874,10 +850,6 @@ class PaymentMethodsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.paymentMethods.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -910,13 +882,14 @@ class ProductsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     query = """
-        products(first: 100, after: $after) {
-            nodes {
-                id
-                code
-                description
-                everythingInPlus
-                internalNotes
+        query getAllProducts ($after: String){
+            products(first: 100, after: $after) {
+                nodes {
+                    id
+                    code
+                    description
+                    everythingInPlus
+                    internalNotes
                 name
                 platformId
                 productCategoryId
@@ -927,6 +900,7 @@ class ProductsStream(BunnyStream):
                 endCursor
                 hasNextPage
                 hasPreviousPage
+            }
             }
         }
     """
@@ -941,10 +915,6 @@ class ProductsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.products.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -964,6 +934,7 @@ class PlansStream(BunnyStream):
 
     name = "plans"
     path = "/graphql"
+    records_jsonpath = "$.data.plans.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("addon", th.BooleanType),
@@ -988,8 +959,9 @@ class PlansStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        plans(first: 100, after: $after) {
-            nodes {
+        query getAllPlans ($after: String){
+            plans(first: 100, after: $after) {
+                nodes {
                 id
                 addon
                 basePrice
@@ -1009,12 +981,13 @@ class PlansStream(BunnyStream):
                 selfServiceCancel
                 selfServiceRenew
                 updatedAt
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1029,10 +1002,6 @@ class PlansStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.plans.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1052,6 +1021,7 @@ class QuotesStream(BunnyStream):
 
     name = "quotes"
     path = "/graphql"
+    records_jsonpath = "$.data.quotes.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("acceptedByName", th.StringType),
@@ -1094,51 +1064,53 @@ class QuotesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        quotes(first: 100, after: $after) {
-            nodes {
-                id
-                acceptedByName
-                acceptedByTitle
-                accountId
-                amount
-                amountDue
-                applicationDate
-                backdatedPeriods
-                backdatedQuote
-                billingDay
-                contactId
-                createdAt
-                credits
-                currencyId
-                dealId
-                discount
-                discountValue
-                evergreen
-                invoiceImmediately
-                invoiceImmediatelyAvailable
-                message
-                name
-                netPaymentDays
-                notes
-                number
-                ownerId
-                payableId
-                periodAmount
-                poNumber
-                smallUnitAmountDue
-                splitInvoice
-                state
-                subtotal
-                taxAmount
-                taxCode
-                updatedAt
-                uuid
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllQuotes ($after: String){    
+            quotes(first: 100, after: $after) {
+                nodes {
+                    id
+                    acceptedByName
+                    acceptedByTitle
+                    accountId
+                    amount
+                    amountDue
+                    applicationDate
+                    backdatedPeriods
+                    backdatedQuote
+                    billingDay
+                    contactId
+                    createdAt
+                    credits
+                    currencyId
+                    dealId
+                    discount
+                    discountValue
+                    evergreen
+                    invoiceImmediately
+                    invoiceImmediatelyAvailable
+                    message
+                    name
+                    netPaymentDays
+                    notes
+                    number
+                    ownerId
+                    payableId
+                    periodAmount
+                    poNumber
+                    smallUnitAmountDue
+                    splitInvoice
+                    state
+                    subtotal
+                    taxAmount
+                    taxCode
+                    updatedAt
+                    uuid
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1153,10 +1125,6 @@ class QuotesStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.quotes.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1176,6 +1144,7 @@ class QuoteChargesStream(BunnyStream):
 
     name = "quote_charges"
     path = "/graphql"
+    records_jsonpath = "$.data.quoteCharges.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("amount", th.NumberType),
@@ -1208,41 +1177,43 @@ class QuoteChargesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        quoteCharges(first: 100, after: $after) {
-            nodes {
-                id
-                amount
-                billingPeriod
-                chargeType
-                couponId
-                createdAt
-                currencyId
-                currentQuantity
-                discount
-                invoiceLineText
-                kind
-                name
-                price
-                priceDecimals
-                priceListChargeId
-                pricingModel
-                prorationRate
-                quantity
-                quantityMax
-                quantityMin
-                quoteChangeId
-                subtotal
-                taxAmount
-                taxCode
-                tieredAveragePrice
-                updatedAt
-                vatCode
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllQuoteCharges ($after: String){
+            quoteCharges(first: 100, after: $after) {
+                nodes {
+                    id
+                    amount
+                    billingPeriod
+                    chargeType
+                    couponId
+                    createdAt
+                    currencyId
+                    currentQuantity
+                    discount
+                    invoiceLineText
+                    kind
+                    name
+                    price
+                    priceDecimals
+                    priceListChargeId
+                    pricingModel
+                    prorationRate
+                    quantity
+                    quantityMax
+                    quantityMin
+                    quoteChangeId
+                    subtotal
+                    taxAmount
+                    taxCode
+                    tieredAveragePrice
+                    updatedAt
+                    vatCode
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1257,10 +1228,6 @@ class QuoteChargesStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.quoteCharges.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1280,6 +1247,7 @@ class RecurringRevenuesStream(BunnyStream):
 
     name = "recurring_revenues"
     path = "/graphql"
+    records_jsonpath = "$.data.recurringRevenues.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1290,20 +1258,22 @@ class RecurringRevenuesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     query = """
-        recurringRevenues(first: 100, after: $after) {
-            nodes {
-                id
-                accountId
-                currencyId
-                recurringAmount
-                totalAmount
-                usageAmount
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllRecurringRevenues ($after: String){
+            recurringRevenues(first: 100, after: $after) {
+                nodes {
+                    id
+                    accountId
+                    currencyId
+                    recurringAmount
+                    totalAmount
+                    usageAmount
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1318,10 +1288,6 @@ class RecurringRevenuesStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.recurringRevenues.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1341,10 +1307,10 @@ class RevenueMovementsStream(BunnyStream):
 
     name = "revenue_movements"
     path = "/graphql"
+    records_jsonpath = "$.data.revenueMovements.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
-        th.Property("currencyId", th.StringType),
         th.Property("date", th.DateTimeType),
         th.Property("movementType", th.StringType),
         th.Property("recurringAmount", th.NumberType),
@@ -1354,23 +1320,27 @@ class RevenueMovementsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     query = """
-        revenueMovements(first: 100, after: $after) {
-            nodes {
-                id
-                accountId
-                currencyId
-                date
-                movementType
-                recurringAmount
-                totalAmount
-                usageAmount
-                usageMovementType
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+    query revenueMovements ($after: String) {
+        revenueMovements (after: $after, first: 100) {
+            edges {
+                cursor
+                node {
+                    accountId
+                    date
+                    id
+                    movementType
+                    recurringAmount
+                    totalAmount
+                    usageAmount
+                    usageMovementType
+                }
+        }
+        pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1385,10 +1355,6 @@ class RevenueMovementsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.revenueMovements.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1408,6 +1374,7 @@ class SubscriptionChargesStream(BunnyStream):
 
     name = "subscription_charges"
     path = "/graphql"
+    records_jsonpath = "$.data.subscriptionCharges.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("amount", th.NumberType),
@@ -1437,38 +1404,40 @@ class SubscriptionChargesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        subscriptionCharges(first: 100, after: $after) {
-            nodes {
-                id
-                amount
-                billingPeriod
-                chargeType
-                createdAt
-                discount
-                discountedPrice
-                invoiceLineText
-                kind
-                name
-                periodPrice
-                price
-                priceDecimals
-                priceListChargeId
-                priceListId
-                pricingModel
-                prorationRate
-                quantity
-                quantityMax
-                quantityMin
-                selfServiceQuantity
-                subscriptionId
-                tieredAveragePrice
-                updatedAt
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllSubscriptionCharges ($after: String){
+            subscriptionCharges(first: 100, after: $after) {
+                nodes {
+                    id
+                    amount
+                    billingPeriod
+                    chargeType
+                    createdAt
+                    discount
+                    discountedPrice
+                    invoiceLineText
+                    kind
+                    name
+                    periodPrice
+                    price
+                    priceDecimals
+                    priceListChargeId
+                    priceListId
+                    pricingModel
+                    prorationRate
+                    quantity
+                    quantityMax
+                    quantityMin
+                    selfServiceQuantity
+                    subscriptionId
+                    tieredAveragePrice
+                    updatedAt
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1483,10 +1452,6 @@ class SubscriptionChargesStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.subscriptionCharges.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1506,6 +1471,7 @@ class TransactionsStream(BunnyStream):
 
     name = "transactions"
     path = "/graphql"
+    records_jsonpath = "$.data.transactions.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1519,22 +1485,24 @@ class TransactionsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "createdAt"
     query = """
-        transactions(first: 100, after: $after) {
-            nodes {
-                id
-                accountId
-                amount
-                createdAt
-                currencyId
-                description
-                state
-                transactionableId
-            }
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
+        query getAllTransactions ($after: String){
+            transactions(first: 100, after: $after) {
+                nodes {
+                    id
+                    accountId
+                    amount
+                    createdAt
+                    currencyId
+                    description
+                    state
+                    transactionableId
+                }
+                pageInfo {
+                    startCursor
+                    endCursor
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1549,10 +1517,6 @@ class TransactionsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.transactions.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1572,6 +1536,7 @@ class TenantsStream(BunnyStream):
 
     name = "tenants"
     path = "/graphql"
+    records_jsonpath = "$.data.tenants.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1591,9 +1556,10 @@ class TenantsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
     query = """
-        tenants(first: 100, after: $after) {
-            nodes {
-                id
+        query getAllTenants ($after: String){
+            tenants(first: 100, after: $after) {
+                nodes {
+                    id
                 accountId
                 code
                 createdAt
@@ -1611,8 +1577,9 @@ class TenantsStream(BunnyStream):
             pageInfo {
                 startCursor
                 endCursor
-                hasNextPage
-                hasPreviousPage
+                    hasNextPage
+                    hasPreviousPage
+                }
             }
         }
     """
@@ -1627,10 +1594,6 @@ class TenantsStream(BunnyStream):
         if next_page_token:
             params["after"] = next_page_token
         return params
-
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result rows."""
-        yield from extract_jsonpath("$.data.tenants.nodes[*]", response.json())
 
     def get_next_page_token(
         self,
@@ -1652,6 +1615,7 @@ class ContactsStream(BunnyStream):
     path = "/graphql"
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+    records_jsonpath = "$.data.contacts.edges[*].node"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1692,8 +1656,8 @@ class ContactsStream(BunnyStream):
     def query(self) -> str:
         """Return the GraphQL query."""
         return """
-        query contacts ($after: String, $before: String, $first: Int, $last: Int, $filter: String, $viewId: ID, $sort: String) {
-          contacts (after: $after, before: $before, first: $first, last: $last, filter: $filter, viewId: $viewId, sort: $sort) {
+        query contacts ($after: String) {
+          contacts (after: $after) {
             edges {
               cursor
               node {
@@ -1732,26 +1696,7 @@ class ContactsStream(BunnyStream):
         }
         """
 
-    def get_graphql_variables(self, next_page_token: Optional[Any] = None) -> Dict[str, Any]:
-        """Return the variables for the GraphQL query."""
-        variables = {
-            "first": 100,
-            "after": next_page_token if next_page_token else "null",
-        }
-        return variables
 
-    def parse_response(self, response: requests.Response) -> t.Iterable[dict]:
-        """Parse the response and return an iterator of result records."""
-        resp_json = response.json(parse_float=decimal.Decimal)
-        if "errors" in resp_json:
-            raise RuntimeError(
-                f"GraphQL query failed: {resp_json['errors']}"
-            )
-        
-        # Extract contacts from the nested structure
-        contacts = resp_json.get("data", {}).get("contacts", {}).get("edges", [])
-        for edge in contacts:
-            yield edge.get("node", {})
 
     def get_next_page_token(
         self,
