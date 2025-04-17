@@ -5,11 +5,10 @@ from __future__ import annotations
 import decimal
 import typing as t
 from datetime import datetime, timedelta
-
 import requests
 from singer_sdk.authenticators import OAuthAuthenticator, SingletonMeta
 from singer_sdk.streams import GraphQLStream
-
+from singer_sdk.helpers.jsonpath import extract_jsonpath
 if t.TYPE_CHECKING:
     from singer_sdk.helpers.typing import Context
 
@@ -155,10 +154,10 @@ class BunnyStream(GraphQLStream):
             variables_info = f"\nVariables: {self.vars}" if hasattr(self, "vars") else ""
             
             raise RuntimeError(
-                "GraphQL query failed for stream '{self.name}':"
+                f"GraphQL query failed for stream '{self.name}':"
                 f"{query_info}"
                 f"{variables_info}\n\n"
-                "Errors:\n" + "\n\n".join(error_messages)
+                f"Errors:\n" + "\n\n".join(error_messages)
             )
 
         # Validate response structure
@@ -167,32 +166,7 @@ class BunnyStream(GraphQLStream):
                 f"Invalid GraphQL response structure. Expected dict, got {type(resp_json)}\n"
                 f"Response: {resp_json}"
             )
-
-        data = resp_json.get("data")
-        if data is None:
-            raise RuntimeError(
-                f"GraphQL response data is null for stream '{self.name}'\n"
-                f"Response: {resp_json}"
-            )
-            
-        stream_data = data.get(self.name)
-        if stream_data is None:
-            raise RuntimeError(
-                f"No data found for stream '{self.name}' in response\n"
-                f"Available fields: {list(data.keys())}\n"
-                f"Response: {data}"
-            )
-            
-        if isinstance(stream_data, dict) and "nodes" in stream_data:
-            nodes = stream_data.get("nodes")
-            if nodes is None:
-                raise RuntimeError(
-                    f"Stream '{self.name}' has null nodes array\n"
-                    f"Response: {stream_data}"
-                )
-            yield from nodes
-        else:
-            yield from [stream_data] if stream_data else []
+        yield from extract_jsonpath(self.records_jsonpath, resp_json)
 
     def post_process(
         self,
