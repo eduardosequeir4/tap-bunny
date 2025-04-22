@@ -5,11 +5,12 @@ from __future__ import annotations
 import typing as t
 from importlib import resources
 from typing import Any, Dict, Optional
+from datetime import datetime, timedelta
 
 from singer_sdk import typing as th  # JSON Schema typing helpers
-
+from singer_sdk.helpers.jsonpath import extract_jsonpath
 import requests
-
+import decimal
 
 from tap_bunny.client import BunnyStream
 
@@ -29,48 +30,22 @@ class UsersStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "modified"
-    records_jsonpath = "$.data.users.edges[*].node"
+
     query = """
-        users(first: 100, after: $after) {
-            edges {
-                cursor
-                node {
-                    name
-                    id
-                    modified
-                }
+    query Users($after: String) {
+        users(first: 10, after: $after) {
+            nodes {
+                id
+                name
+                modified
             }
             pageInfo {
                 hasNextPage
                 endCursor
             }
         }
-        """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data.get("data", {}).get("users", {}).get("pageInfo", {})
-        
-        if page_info.get("hasNextPage"):
-            return page_info.get("endCursor")
-        return None
+    }
+    """
 
 
 class GroupsStream(BunnyStream):
@@ -78,7 +53,6 @@ class GroupsStream(BunnyStream):
 
     name = "groups"
     path = "/graphql"
-    records_jsonpath = "$.data.groups.edges[*].node"
     schema = th.PropertiesList(
         th.Property("name", th.StringType),
         th.Property("id", th.StringType),
@@ -86,49 +60,22 @@ class GroupsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "modified"
+
     query = """
-        query getAllGroups ($after: String, $before: String, $first: Int, $last: Int, $filter: String, $viewId: ID, $sort: String){
-        groups(first: 100, after: $after) {
-            edges {
-                cursor
-                node {
-                    name
-                    id
-                    modified
-                }
+    query Groups($after: String) {
+        groups(first: 10, after: $after) {
+            nodes {
+                id
+                name
+                modified
             }
             pageInfo {
                 hasNextPage
                 endCursor
-                }
             }
         }
-        """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data.get("data", {}).get("groups", {}).get("pageInfo", {})
-        
-        if page_info.get("hasNextPage"):
-            return page_info.get("endCursor")
-        return None
+    }
+    """
 
 
 class AccountsStream(BunnyStream):
@@ -136,7 +83,6 @@ class AccountsStream(BunnyStream):
 
     name = "accounts"
     path = "/graphql"
-    records_jsonpath = "$.data.accounts.edges[*].node"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountTypeId", th.StringType),
@@ -180,26 +126,13 @@ class AccountsStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
         th.Property("website", th.StringType),
     ).to_dict()
+    primary_keys: t.ClassVar[list[str]] = ["id"]
+    replication_key = "createdAt"
 
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    @property
-    def query(self) -> str:
-        """Return the GraphQL query."""
-        return """
-        query getAllAccounts ($after: String, $before: String, $first: Int, $last: Int, $filter: String, $viewId: ID, $sort: String){
-          accounts (after: $after, before: $before, first: $first, last: $last, filter: $filter, viewId: $viewId, sort: $sort){
-            edges {
-              node {
+    query = """
+    query Accounts($after: String) {
+        accounts(first: 10, after: $after) {
+            nodes {
                 id
                 accountTypeId
                 annualRevenue
@@ -241,33 +174,14 @@ class AccountsStream(BunnyStream):
                 timezone
                 updatedAt
                 website
-              }
             }
-            totalCount
             pageInfo {
-              startCursor
-              endCursor
-              hasNextPage
-              hasPreviousPage
+                hasNextPage
+                endCursor
             }
-          }
         }
-        """
-
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        resp_json = response.json()
-        page_info = resp_json.get("data", {}).get("accounts", {}).get("pageInfo", {})
-        
-        if page_info.get("hasNextPage"):
-            return page_info.get("endCursor")
-        return None
+    }
+    """
 
 
 class SubscriptionsStream(BunnyStream):
@@ -275,7 +189,6 @@ class SubscriptionsStream(BunnyStream):
 
     name = "subscriptions"
     path = "/graphql"
-    records_jsonpath = "$.data.subscriptions.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -298,62 +211,37 @@ class SubscriptionsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllSubscriptions ($after: String){
-            subscriptions(first: 100, after: $after) {
-                nodes {
-                    id
-                    accountId
-                    name
-                    period
-                    evergreen
-                    state
-                    currencyId
-                    priceListId
-                    provisioningRequired
-                    rampIntervalMonths
-                    startDate
-                    endDate
-                    trialStartDate
-                    trialEndDate
-                    trialPeriod
-                    cancellationDate
-                    createdAt
-                    updatedAt
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query Subscriptions($after: String) {
+        subscriptions(first: 10, after: $after) {
+            nodes {
+                id
+                accountId
+                name
+                period
+                evergreen
+                state
+                currencyId
+                priceListId
+                provisioningRequired
+                rampIntervalMonths
+                startDate
+                endDate
+                trialStartDate
+                trialEndDate
+                trialPeriod
+                cancellationDate
+                createdAt
+                updatedAt
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["subscriptions"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class AccountBalancesStream(BunnyStream):
@@ -361,7 +249,6 @@ class AccountBalancesStream(BunnyStream):
 
     name = "account_balances"
     path = "/graphql"
-    records_jsonpath = "$.data.accountBalances.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -369,48 +256,23 @@ class AccountBalancesStream(BunnyStream):
         th.Property("currencyId", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
+
     query = """
-        query accountBalances($after: String) {
-            accountBalances(first: 100, after: $after) {
-                nodes {
-                    id
-                    accountId
-                    balance
-                    currencyId
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query AccountBalances($after: String) {
+        accountBalances(first: 10, after: $after) {
+            nodes {
+                id
+                accountId
+                balance
+                currencyId
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["accountBalances"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class EntitiesStream(BunnyStream):
@@ -418,7 +280,6 @@ class EntitiesStream(BunnyStream):
 
     name = "entities"
     path = "/graphql"
-    records_jsonpath = "$.data.entities.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("abbreviation", th.StringType),
@@ -459,79 +320,55 @@ class EntitiesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllEntities ($after: String){
-                entities(first: 100, after: $after) {
-                    nodes {
-                        id
-                    abbreviation
-                    accentColor
-                    baseCurrencyId
-                    billingCity
-                    billingCountry
-                    billingState
-                    billingStreet
-                    billingZip
-                    brandColor
-                    createdAt
-                    customerServiceEmail
-                    emailSenderName
-                    emailTemplate
-                    fax
-                    fiscalYearStartMonth
-                    invoiceNumberPrefix
-                    invoiceNumberSeq
-                    invoicesImageUrl
-                    isDefault
-                    name
-                    phone
-                    privacyUrl
-                    quoteNumberPrefix
-                    quoteNumberSeq
-                    quotesImageUrl
-                    refundPolicyUrl
-                    taxId
-                    taxType
-                    termsUrl
-                    timezone
-                    topNavImageUrl
-                    tzIdentifier
-                    tzOffset
-                    updatedAt
-                    website
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query Entities($after: String) {
+        entities(first: 10, after: $after) {
+            nodes {
+                id
+                abbreviation
+                accentColor
+                baseCurrencyId
+                billingCity
+                billingCountry
+                billingState
+                billingStreet
+                billingZip
+                brandColor
+                createdAt
+                customerServiceEmail
+                emailSenderName
+                emailTemplate
+                fax
+                fiscalYearStartMonth
+                invoiceNumberPrefix
+                invoiceNumberSeq
+                invoicesImageUrl
+                isDefault
+                name
+                phone
+                privacyUrl
+                quoteNumberPrefix
+                quoteNumberSeq
+                quotesImageUrl
+                refundPolicyUrl
+                taxId
+                taxType
+                termsUrl
+                timezone
+                topNavImageUrl
+                tzIdentifier
+                tzOffset
+                updatedAt
+                website
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["entities"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class InvoicesStream(BunnyStream):
@@ -539,7 +376,6 @@ class InvoicesStream(BunnyStream):
 
     name = "invoices"
     path = "/graphql"
-    records_jsonpath = "$.data.invoices.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -570,70 +406,45 @@ class InvoicesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllInvoices ($after: String){
-            invoices(first: 100, after: $after) {
-                nodes {
-                    id
-                    accountId
-                    amount
-                    amountDue
-                    amountPaid
-                    createdAt
-                    credits
-                    currencyId
-                    description
-                    dueAt
-                    issuedAt
-                    kind
-                    netPaymentDays
-                    number
-                    paidAt
-                    payableId
-                    poNumber
-                    portalUrl
-                    quoteId
-                    smallUnitAmountDue
-                    state
-                    subtotal
-                    taxAmount
-                    updatedAt
-                    url
-                    uuid
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query Invoices($after: String) {
+        invoices(first: 10, after: $after) {
+            nodes {
+                id
+                accountId
+                amount
+                amountDue
+                amountPaid
+                createdAt
+                credits
+                currencyId
+                description
+                dueAt
+                issuedAt
+                kind
+                netPaymentDays
+                number
+                paidAt
+                payableId
+                poNumber
+                portalUrl
+                quoteId
+                smallUnitAmountDue
+                state
+                subtotal
+                taxAmount
+                updatedAt
+                url
+                uuid
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["invoices"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class InvoiceItemsStream(BunnyStream):
@@ -641,7 +452,6 @@ class InvoiceItemsStream(BunnyStream):
 
     name = "invoice_items"
     path = "/graphql"
-    records_jsonpath = "$.data.invoiceItems.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("amount", th.NumberType),
@@ -650,11 +460,12 @@ class InvoiceItemsStream(BunnyStream):
         th.Property("currencyId", th.StringType),
         th.Property("discount", th.NumberType),
         th.Property("invoiceId", th.StringType),
-        th.Property("isCoupon", th.BooleanType),
-        th.Property("isCredit", th.BooleanType),
+        th.Property("kind", th.StringType),
         th.Property("lineText", th.StringType),
         th.Property("position", th.IntegerType),
         th.Property("price", th.NumberType),
+        th.Property("priceDecimals", th.IntegerType),
+        th.Property("prorationRate", th.NumberType),
         th.Property("quantity", th.NumberType),
         th.Property("subtotal", th.NumberType),
         th.Property("taxAmount", th.NumberType),
@@ -662,59 +473,37 @@ class InvoiceItemsStream(BunnyStream):
         th.Property("vatCode", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
+
     query = """
-        query getAllInvoiceItems ($after: String){
-            invoiceItems(first: 100, after: $after) {
-                nodes {
-                    id
-                    amount
-                    chargeType
-                    couponId
-                    discount
-                    invoiceId
-                    isCoupon
-                    isCredit
-                    lineText
-                    position
-                    price
-                    quantity
-                    subtotal
-                    taxAmount
-                    taxCode
-                    vatCode
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query InvoiceItems($after: String) {
+        invoiceItems(first: 10, after: $after) {
+            nodes {
+                id
+                amount
+                chargeType
+                couponId
+                currencyId
+                discount
+                invoiceId
+                kind
+                lineText
+                position
+                price
+                priceDecimals
+                prorationRate
+                quantity
+                subtotal
+                taxAmount
+                taxCode
+                vatCode
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["invoiceItems"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class PaymentsStream(BunnyStream):
@@ -722,7 +511,6 @@ class PaymentsStream(BunnyStream):
 
     name = "payments"
     path = "/graphql"
-    records_jsonpath = "$.data.payments.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -741,11 +529,12 @@ class PaymentsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllPayments ($after: String){
-            payments(first: 100, after: $after) {
-                nodes {
-                    id
+    query Payments($after: String) {
+        payments(first: 10, after: $after) {
+            nodes {
+                id
                 accountId
                 amount
                 amountUnapplied
@@ -761,37 +550,12 @@ class PaymentsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                startCursor
-                endCursor
                 hasNextPage
-                hasPreviousPage
+                endCursor
             }
         }
     }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["payments"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class PaymentMethodsStream(BunnyStream):
@@ -814,11 +578,12 @@ class PaymentMethodsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllPaymentMethods ($after: String){
-            paymentMethods(first: 100, after: $after) {
-                nodes {
-                    id
+    query PaymentMethods($after: String) {
+        paymentMethods(first: 10, after: $after) {
+            nodes {
+                id
                 accountId
                 createdAt
                 disabled
@@ -831,37 +596,12 @@ class PaymentMethodsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["paymentMethods"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class ProductsStream(BunnyStream):
@@ -881,52 +621,28 @@ class ProductsStream(BunnyStream):
         th.Property("showProductNameOnLineItem", th.BooleanType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
+
     query = """
-        query getAllProducts ($after: String){
-            products(first: 100, after: $after) {
-                nodes {
-                    id
-                    code
-                    description
-                    everythingInPlus
-                    internalNotes
+    query Products($after: String) {
+        products(first: 10, after: $after) {
+            nodes {
+                id
+                code
+                description
+                everythingInPlus
+                internalNotes
                 name
                 platformId
                 productCategoryId
                 showProductNameOnLineItem
             }
             pageInfo {
-                startCursor
-                endCursor
                 hasNextPage
-                hasPreviousPage
-            }
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["products"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class PlansStream(BunnyStream):
@@ -934,7 +650,6 @@ class PlansStream(BunnyStream):
 
     name = "plans"
     path = "/graphql"
-    records_jsonpath = "$.data.plans.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("addon", th.BooleanType),
@@ -958,10 +673,11 @@ class PlansStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllPlans ($after: String){
-            plans(first: 100, after: $after) {
-                nodes {
+    query Plans($after: String) {
+        plans(first: 10, after: $after) {
+            nodes {
                 id
                 addon
                 basePrice
@@ -981,39 +697,14 @@ class PlansStream(BunnyStream):
                 selfServiceCancel
                 selfServiceRenew
                 updatedAt
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["plans"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class QuotesStream(BunnyStream):
@@ -1021,7 +712,6 @@ class QuotesStream(BunnyStream):
 
     name = "quotes"
     path = "/graphql"
-    records_jsonpath = "$.data.quotes.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("acceptedByName", th.StringType),
@@ -1063,80 +753,56 @@ class QuotesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllQuotes ($after: String){    
-            quotes(first: 100, after: $after) {
-                nodes {
-                    id
-                    acceptedByName
-                    acceptedByTitle
-                    accountId
-                    amount
-                    amountDue
-                    applicationDate
-                    backdatedPeriods
-                    backdatedQuote
-                    billingDay
-                    contactId
-                    createdAt
-                    credits
-                    currencyId
-                    dealId
-                    discount
-                    discountValue
-                    evergreen
-                    invoiceImmediately
-                    invoiceImmediatelyAvailable
-                    message
-                    name
-                    netPaymentDays
-                    notes
-                    number
-                    ownerId
-                    payableId
-                    periodAmount
-                    poNumber
-                    smallUnitAmountDue
-                    splitInvoice
-                    state
-                    subtotal
-                    taxAmount
-                    taxCode
-                    updatedAt
-                    uuid
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query Quotes($after: String) {
+        quotes(first: 10, after: $after) {
+            nodes {
+                id
+                acceptedByName
+                acceptedByTitle
+                accountId
+                amount
+                amountDue
+                applicationDate
+                backdatedPeriods
+                backdatedQuote
+                billingDay
+                contactId
+                createdAt
+                credits
+                currencyId
+                dealId
+                discount
+                discountValue
+                evergreen
+                invoiceImmediately
+                invoiceImmediatelyAvailable
+                message
+                name
+                netPaymentDays
+                notes
+                number
+                ownerId
+                payableId
+                periodAmount
+                poNumber
+                smallUnitAmountDue
+                splitInvoice
+                state
+                subtotal
+                taxAmount
+                taxCode
+                updatedAt
+                uuid
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["quotes"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class QuoteChargesStream(BunnyStream):
@@ -1144,7 +810,6 @@ class QuoteChargesStream(BunnyStream):
 
     name = "quote_charges"
     path = "/graphql"
-    records_jsonpath = "$.data.quoteCharges.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("amount", th.NumberType),
@@ -1176,70 +841,46 @@ class QuoteChargesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllQuoteCharges ($after: String){
-            quoteCharges(first: 100, after: $after) {
-                nodes {
-                    id
-                    amount
-                    billingPeriod
-                    chargeType
-                    couponId
-                    createdAt
-                    currencyId
-                    currentQuantity
-                    discount
-                    invoiceLineText
-                    kind
-                    name
-                    price
-                    priceDecimals
-                    priceListChargeId
-                    pricingModel
-                    prorationRate
-                    quantity
-                    quantityMax
-                    quantityMin
-                    quoteChangeId
-                    subtotal
-                    taxAmount
-                    taxCode
-                    tieredAveragePrice
-                    updatedAt
-                    vatCode
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query QuoteCharges($after: String) {
+        quoteCharges(first: 10, after: $after) {
+            nodes {
+                id
+                amount
+                billingPeriod
+                chargeType
+                couponId
+                createdAt
+                currencyId
+                currentQuantity
+                discount
+                invoiceLineText
+                kind
+                name
+                price
+                priceDecimals
+                priceListChargeId
+                pricingModel
+                prorationRate
+                quantity
+                quantityMax
+                quantityMin
+                quoteChangeId
+                subtotal
+                taxAmount
+                taxCode
+                tieredAveragePrice
+                updatedAt
+                vatCode
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["quoteCharges"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class RecurringRevenuesStream(BunnyStream):
@@ -1247,7 +888,6 @@ class RecurringRevenuesStream(BunnyStream):
 
     name = "recurring_revenues"
     path = "/graphql"
-    records_jsonpath = "$.data.recurringRevenues.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1257,49 +897,25 @@ class RecurringRevenuesStream(BunnyStream):
         th.Property("usageAmount", th.NumberType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
+
     query = """
-        query getAllRecurringRevenues ($after: String){
-            recurringRevenues(first: 100, after: $after) {
-                nodes {
-                    id
-                    accountId
-                    currencyId
-                    recurringAmount
-                    totalAmount
-                    usageAmount
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query RecurringRevenues($after: String) {
+        recurringRevenues(first: 10, after: $after) {
+            nodes {
+                id
+                accountId
+                currencyId
+                recurringAmount
+                totalAmount
+                usageAmount
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["recurringRevenues"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class RevenueMovementsStream(BunnyStream):
@@ -1307,66 +923,45 @@ class RevenueMovementsStream(BunnyStream):
 
     name = "revenue_movements"
     path = "/graphql"
-    records_jsonpath = "$.data.revenueMovements.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
+        th.Property("accountName", th.StringType),
+        th.Property("currencyId", th.StringType),
         th.Property("date", th.DateTimeType),
-        th.Property("movementType", th.StringType),
-        th.Property("recurringAmount", th.NumberType),
-        th.Property("totalAmount", th.NumberType),
         th.Property("usageAmount", th.NumberType),
         th.Property("usageMovementType", th.StringType),
+        th.Property("recurringAmount", th.NumberType),
+        th.Property("movementType", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
+
     query = """
-    query revenueMovements ($after: String) {
-        revenueMovements (after: $after, first: 100) {
-            edges {
-                cursor
-                node {
-                    accountId
-                    date
+    query revenueMovements {
+        revenueMovements(first: 26, sort: "date desc") {
+            pageInfo {
+                startCursor
+                endCursor
+                hasNextPage
+                hasPreviousPage
+            }
+            totalCount
+            nodes {
+                id
+                account {
+                    name
                     id
-                    movementType
-                    recurringAmount
-                    totalAmount
-                    usageAmount
-                    usageMovementType
                 }
-        }
-        pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+                currencyId
+                date
+                usageAmount
+                usageMovementType
+                recurringAmount
+                movementType
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["revenueMovements"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class SubscriptionChargesStream(BunnyStream):
@@ -1374,7 +969,6 @@ class SubscriptionChargesStream(BunnyStream):
 
     name = "subscription_charges"
     path = "/graphql"
-    records_jsonpath = "$.data.subscriptionCharges.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("amount", th.NumberType),
@@ -1403,67 +997,43 @@ class SubscriptionChargesStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllSubscriptionCharges ($after: String){
-            subscriptionCharges(first: 100, after: $after) {
-                nodes {
-                    id
-                    amount
-                    billingPeriod
-                    chargeType
-                    createdAt
-                    discount
-                    discountedPrice
-                    invoiceLineText
-                    kind
-                    name
-                    periodPrice
-                    price
-                    priceDecimals
-                    priceListChargeId
-                    priceListId
-                    pricingModel
-                    prorationRate
-                    quantity
-                    quantityMax
-                    quantityMin
-                    selfServiceQuantity
-                    subscriptionId
-                    tieredAveragePrice
-                    updatedAt
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query SubscriptionCharges($after: String) {
+        subscriptionCharges(first: 10, after: $after) {
+            nodes {
+                id
+                amount
+                billingPeriod
+                chargeType
+                createdAt
+                discount
+                discountedPrice
+                invoiceLineText
+                kind
+                name
+                periodPrice
+                price
+                priceDecimals
+                priceListChargeId
+                priceListId
+                pricingModel
+                prorationRate
+                quantity
+                quantityMax
+                quantityMin
+                selfServiceQuantity
+                subscriptionId
+                tieredAveragePrice
+                updatedAt
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["subscriptionCharges"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class TransactionsStream(BunnyStream):
@@ -1471,7 +1041,6 @@ class TransactionsStream(BunnyStream):
 
     name = "transactions"
     path = "/graphql"
-    records_jsonpath = "$.data.transactions.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1484,51 +1053,27 @@ class TransactionsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "createdAt"
+
     query = """
-        query getAllTransactions ($after: String){
-            transactions(first: 100, after: $after) {
-                nodes {
-                    id
-                    accountId
-                    amount
-                    createdAt
-                    currencyId
-                    description
-                    state
-                    transactionableId
-                }
-                pageInfo {
-                    startCursor
-                    endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
+    query Transactions($after: String) {
+        transactions(first: 10, after: $after) {
+            nodes {
+                id
+                accountId
+                amount
+                createdAt
+                currencyId
+                description
+                state
+                transactionableId
+            }
+            pageInfo {
+                hasNextPage
+                endCursor
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["transactions"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class TenantsStream(BunnyStream):
@@ -1536,7 +1081,6 @@ class TenantsStream(BunnyStream):
 
     name = "tenants"
     path = "/graphql"
-    records_jsonpath = "$.data.tenants.nodes[*]"
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1555,11 +1099,12 @@ class TenantsStream(BunnyStream):
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
+
     query = """
-        query getAllTenants ($after: String){
-            tenants(first: 100, after: $after) {
-                nodes {
-                    id
+    query Tenants($after: String) {
+        tenants(first: 10, after: $after) {
+            nodes {
+                id
                 accountId
                 code
                 createdAt
@@ -1575,37 +1120,12 @@ class TenantsStream(BunnyStream):
                 utilizationMetrics
             }
             pageInfo {
-                startCursor
+                hasNextPage
                 endCursor
-                    hasNextPage
-                    hasPreviousPage
-                }
             }
         }
+    }
     """
-
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        data = response.json()
-        page_info = data["data"]["tenants"]["pageInfo"]
-        if page_info["hasNextPage"]:
-            return page_info["endCursor"]
-        return None
 
 
 class ContactsStream(BunnyStream):
@@ -1615,7 +1135,7 @@ class ContactsStream(BunnyStream):
     path = "/graphql"
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
-    records_jsonpath = "$.data.contacts.edges[*].node"
+
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
@@ -1641,26 +1161,10 @@ class ContactsStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
     ).to_dict()
 
-    def get_url_params(
-        self,
-        context: Optional[dict],
-        next_page_token: Optional[Any],
-    ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used in URL parameterization."""
-        params: dict = {}
-        if next_page_token:
-            params["after"] = next_page_token
-        return params
-
-    @property
-    def query(self) -> str:
-        """Return the GraphQL query."""
-        return """
-        query contacts ($after: String) {
-          contacts (after: $after) {
-            edges {
-              cursor
-              node {
+    query = """
+    query Contacts($after: String) {
+        contacts(first: 10, after: $after) {
+            nodes {
                 id
                 accountId
                 code
@@ -1683,30 +1187,11 @@ class ContactsStream(BunnyStream):
                 salutation
                 title
                 updatedAt
-              }
             }
-            totalCount
             pageInfo {
-              startCursor
-              endCursor
-              hasNextPage
-              hasPreviousPage
+                hasNextPage
+                endCursor
             }
-          }
         }
-        """
-
-
-
-    def get_next_page_token(
-        self,
-        response: requests.Response,
-        previous_token: Optional[Any],
-    ) -> Optional[Any]:
-        """Return token for identifying next page or None if no more pages."""
-        resp_json = response.json()
-        page_info = resp_json.get("data", {}).get("contacts", {}).get("pageInfo", {})
-        
-        if page_info.get("hasNextPage"):
-            return page_info.get("endCursor")
-        return None
+    }
+    """
