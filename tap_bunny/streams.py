@@ -43,9 +43,9 @@ class UsersStream(BunnyStream):
                 hasNextPage
                 endCursor
             }
+            }
         }
-    }
-    """
+        """
 
 
 class GroupsStream(BunnyStream):
@@ -949,8 +949,8 @@ class RevenueMovementsStream(BunnyStream):
             nodes {
                 id
                 account {
-                    name
-                    id
+            name
+            id
                 }
                 currencyId
                 date
@@ -1193,5 +1193,5 @@ class ContactsStream(BunnyStream):
                 endCursor
             }
         }
-    }
-    """
+        }
+        """

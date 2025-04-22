@@ -6,6 +6,8 @@ import decimal
 import typing as t
 from datetime import datetime, timedelta
 from typing import Optional, Any, Dict
+import argparse
+import json
 
 import requests
 from singer_sdk.authenticators import OAuthAuthenticator, SingletonMeta
@@ -24,9 +26,37 @@ class BunnyAuthenticator(OAuthAuthenticator, metaclass=SingletonMeta):
             stream=stream,
             auth_endpoint=auth_url,
         )
-        self._access_token = None
-        self._expires_at = None
-        self.update_access_token()
+        self._stream = stream
+        self._access_token = stream.config.get("access_token")
+        self._expires_at = stream.config.get("token_expires_at")
+        if not self._access_token or not self._expires_at or datetime.now() >= datetime.fromisoformat(self._expires_at):
+            self.update_access_token()
+
+    def is_token_valid(self) -> bool:
+        """Check if the current token is valid.
+        
+        Returns:
+            bool: True if token is valid, False otherwise
+        """
+        if not self._access_token or not self._expires_at:
+            return False
+        return datetime.now() < datetime.fromisoformat(self._expires_at)
+
+    def handle_401_response(self, response: requests.Response) -> None:
+        """Handle 401 Unauthorized response by refreshing the token.
+        
+        Args:
+            response: The HTTP response that returned 401
+            
+        Raises:
+            RuntimeError: If token refresh fails
+        """
+        if response.status_code == 401:
+            self.logger.warning("Received 401 Unauthorized response. Attempting to refresh token...")
+            try:
+                self.update_access_token()
+            except Exception as e:
+                raise RuntimeError(f"Failed to refresh token after 401 response: {str(e)}")
 
     @property
     def oauth_request_body(self) -> dict:
@@ -47,13 +77,29 @@ class BunnyAuthenticator(OAuthAuthenticator, metaclass=SingletonMeta):
         response.raise_for_status()
         auth_data = response.json()
         self._access_token = auth_data["access_token"]
-        self._expires_at = datetime.now() + timedelta(seconds=auth_data["expires_in"])
+        
+        # Calculate expiration time using created_at timestamp
+        created_at = datetime.fromtimestamp(auth_data["created_at"])
+        expires_at = created_at + timedelta(seconds=auth_data["expires_in"])
+        self._expires_at = expires_at.isoformat()
+        
+        # Update config with new token
+        self._stream.update_config({
+            "access_token": self._access_token,
+            "token_expires_at": self._expires_at
+        })
 
     @property
     def access_token(self) -> str:
         """Return the access token."""
-        if not self._access_token or not self._expires_at or datetime.now() >= self._expires_at:
+        if not self._access_token or not self._expires_at:
             self.update_access_token()
+        else:
+            expires_at = datetime.fromisoformat(self._expires_at)
+            # Refresh token if it expires in less than 5 minutes
+            if datetime.now() + timedelta(minutes=5) >= expires_at:
+                self.logger.info("Token expires in less than 5 minutes, refreshing...")
+                self.update_access_token()
         return self._access_token
 
     @access_token.setter
@@ -64,6 +110,30 @@ class BunnyAuthenticator(OAuthAuthenticator, metaclass=SingletonMeta):
 
 class BunnyStream(GraphQLStream):
     """Bunny stream class."""
+
+    def _request_with_backoff(self, prepared_request: requests.PreparedRequest, context: dict) -> requests.Response:
+        """Execute a request with backoff and token refresh handling.
+        
+        Args:
+            prepared_request: The prepared request to execute
+            context: The stream context
+            
+        Returns:
+            The HTTP response
+            
+        Raises:
+            RuntimeError: If the request fails after token refresh
+        """
+        response = super()._request_with_backoff(prepared_request, context)
+        
+        # If we get a 401, try to refresh the token and retry once
+        if response.status_code == 401:
+            self.authenticator.handle_401_response(response)
+            # Retry the request with the new token
+            prepared_request.headers["Authorization"] = f"Bearer {self.authenticator.access_token}"
+            response = super()._request_with_backoff(prepared_request, context)
+            
+        return response
 
     @property
     def url_base(self) -> str:

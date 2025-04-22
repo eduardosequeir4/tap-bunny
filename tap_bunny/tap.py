@@ -8,6 +8,10 @@ from singer_sdk import typing as th  # JSON schema typing helpers
 from tap_bunny import streams
 from tap_bunny.client import BunnyAuthenticator
 
+import argparse
+import json
+from typing import Dict
+
 STREAM_TYPES = [
     streams.AccountsStream,
     streams.ContactsStream,
@@ -104,6 +108,25 @@ class TapBunny(Tap):
         """Get the authenticator instance."""
         auth_url = self._get_auth_url()
         return BunnyAuthenticator(self, auth_url=auth_url)
+
+    def update_config(self, new_fields: Dict[str, str]) -> None:
+        """Update the config.
+
+        Args:
+            new_fields: Dictionary of new fields to update in the config
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-c', '--config', help='Config file', required=True)
+        _args, unknown = parser.parse_known_args()
+        config_file = _args.config
+        with open(f"{config_file}", 'r') as filetoread:
+            data = filetoread.read()
+        self.logger.info(f"Config file: {data}")
+        config = json.loads(data)
+        config.update(new_fields)
+        self.logger.info(f"Config: {config}")
+        with open(f"{config_file}", 'w') as filetowrite:
+            json.dump(config, filetowrite)
 
 
 if __name__ == "__main__":
