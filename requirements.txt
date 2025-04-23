@@ -1,0 +1,4 @@
+singer-sdk>=0.14.0
+requests>=2.31.0
+python-dateutil>=2.8.2
+typing-extensions>=4.5.0 
