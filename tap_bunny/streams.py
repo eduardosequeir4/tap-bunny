@@ -976,7 +976,7 @@ class SubscriptionChargesStream(BunnyStream):
         th.Property("chargeType", th.StringType),
         th.Property("createdAt", th.DateTimeType),
         th.Property("discount", th.NumberType),
-        th.Property("discountedPrice", th.NumberType),
+        th.Property("discountedPrice", th.CustomType({"type": ["number", "string", "null"]})),
         th.Property("invoiceLineText", th.StringType),
         th.Property("kind", th.StringType),
         th.Property("name", th.StringType),
