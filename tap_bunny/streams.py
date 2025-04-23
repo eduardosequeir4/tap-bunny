@@ -720,7 +720,7 @@ class QuotesStream(BunnyStream):
         th.Property("amount", th.NumberType),
         th.Property("amountDue", th.NumberType),
         th.Property("applicationDate", th.DateTimeType),
-        th.Property("backdatedPeriods", th.IntegerType),
+        th.Property("backdatedPeriods", th.UnionType([th.IntegerType, th.BooleanType])),
         th.Property("backdatedQuote", th.BooleanType),
         th.Property("billingDay", th.IntegerType),
         th.Property("contactId", th.StringType),
