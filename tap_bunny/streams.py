@@ -763,7 +763,6 @@ class QuotesStream(BunnyStream):
                 acceptedByTitle
                 accountId
                 amount
-                amountDue
                 applicationDate
                 backdatedPeriods
                 backdatedQuote
