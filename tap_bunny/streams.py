@@ -1162,7 +1162,7 @@ class ContactsStream(BunnyStream):
 
     query = """
     query Contacts($after: String) {
-        contacts(first: 10, after: $after) {
+        contacts(first: 100, after: $after) {
             nodes {
                 id
                 accountId
@@ -1192,5 +1192,5 @@ class ContactsStream(BunnyStream):
                 endCursor
             }
         }
-        }
-        """
+    }
+    """
