@@ -756,7 +756,7 @@ class QuotesStream(BunnyStream):
 
     query = """
     query Quotes($after: String) {
-        quotes(first: 10, after: $after) {
+        quotes(first: 50, after: $after) {
             nodes {
                 id
                 acceptedByName
