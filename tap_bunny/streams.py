@@ -33,19 +33,21 @@ class UsersStream(BunnyStream):
 
     query = """
     query Users($after: String) {
-        users(first: 10, after: $after) {
+        users(first: 50, after: $after) {
             nodes {
                 id
                 name
                 modified
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
-            }
+                hasNextPage
+                hasPreviousPage
             }
         }
-        """
+    }
+    """
 
 
 class GroupsStream(BunnyStream):
@@ -63,15 +65,17 @@ class GroupsStream(BunnyStream):
 
     query = """
     query Groups($after: String) {
-        groups(first: 10, after: $after) {
+        groups(first: 50, after: $after) {
             nodes {
                 id
                 name
                 modified
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -131,7 +135,7 @@ class AccountsStream(BunnyStream):
 
     query = """
     query Accounts($after: String) {
-        accounts(first: 10, after: $after) {
+        accounts(first: 50, after: $after) {
             nodes {
                 id
                 accountTypeId
@@ -176,8 +180,10 @@ class AccountsStream(BunnyStream):
                 website
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -214,7 +220,7 @@ class SubscriptionsStream(BunnyStream):
 
     query = """
     query Subscriptions($after: String) {
-        subscriptions(first: 10, after: $after) {
+        subscriptions(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -236,8 +242,10 @@ class SubscriptionsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -259,7 +267,7 @@ class AccountBalancesStream(BunnyStream):
 
     query = """
     query AccountBalances($after: String) {
-        accountBalances(first: 10, after: $after) {
+        accountBalances(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -267,8 +275,10 @@ class AccountBalancesStream(BunnyStream):
                 currencyId
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -323,7 +333,7 @@ class EntitiesStream(BunnyStream):
 
     query = """
     query Entities($after: String) {
-        entities(first: 10, after: $after) {
+        entities(first: 50, after: $after) {
             nodes {
                 id
                 abbreviation
@@ -363,8 +373,10 @@ class EntitiesStream(BunnyStream):
                 website
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -409,7 +421,7 @@ class InvoicesStream(BunnyStream):
 
     query = """
     query Invoices($after: String) {
-        invoices(first: 10, after: $after) {
+        invoices(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -439,8 +451,10 @@ class InvoicesStream(BunnyStream):
                 uuid
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -476,7 +490,7 @@ class InvoiceItemsStream(BunnyStream):
 
     query = """
     query InvoiceItems($after: String) {
-        invoiceItems(first: 10, after: $after) {
+        invoiceItems(first: 50, after: $after) {
             nodes {
                 id
                 amount
@@ -498,8 +512,10 @@ class InvoiceItemsStream(BunnyStream):
                 vatCode
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -532,7 +548,7 @@ class PaymentsStream(BunnyStream):
 
     query = """
     query Payments($after: String) {
-        payments(first: 10, after: $after) {
+        payments(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -550,8 +566,10 @@ class PaymentsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -581,7 +599,7 @@ class PaymentMethodsStream(BunnyStream):
 
     query = """
     query PaymentMethods($after: String) {
-        paymentMethods(first: 10, after: $after) {
+        paymentMethods(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -596,8 +614,10 @@ class PaymentMethodsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -624,7 +644,7 @@ class ProductsStream(BunnyStream):
 
     query = """
     query Products($after: String) {
-        products(first: 10, after: $after) {
+        products(first: 50, after: $after) {
             nodes {
                 id
                 code
@@ -637,8 +657,10 @@ class ProductsStream(BunnyStream):
                 showProductNameOnLineItem
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -676,7 +698,7 @@ class PlansStream(BunnyStream):
 
     query = """
     query Plans($after: String) {
-        plans(first: 10, after: $after) {
+        plans(first: 50, after: $after) {
             nodes {
                 id
                 addon
@@ -699,8 +721,10 @@ class PlansStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -763,6 +787,7 @@ class QuotesStream(BunnyStream):
                 acceptedByTitle
                 accountId
                 amount
+                amountDue
                 applicationDate
                 backdatedPeriods
                 backdatedQuote
@@ -796,8 +821,10 @@ class QuotesStream(BunnyStream):
                 uuid
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -843,7 +870,7 @@ class QuoteChargesStream(BunnyStream):
 
     query = """
     query QuoteCharges($after: String) {
-        quoteCharges(first: 10, after: $after) {
+        quoteCharges(first: 50, after: $after) {
             nodes {
                 id
                 amount
@@ -874,8 +901,10 @@ class QuoteChargesStream(BunnyStream):
                 vatCode
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -899,7 +928,7 @@ class RecurringRevenuesStream(BunnyStream):
 
     query = """
     query RecurringRevenues($after: String) {
-        recurringRevenues(first: 10, after: $after) {
+        recurringRevenues(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -909,8 +938,10 @@ class RecurringRevenuesStream(BunnyStream):
                 usageAmount
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -999,7 +1030,7 @@ class SubscriptionChargesStream(BunnyStream):
 
     query = """
     query SubscriptionCharges($after: String) {
-        subscriptionCharges(first: 10, after: $after) {
+        subscriptionCharges(first: 50, after: $after) {
             nodes {
                 id
                 amount
@@ -1027,8 +1058,10 @@ class SubscriptionChargesStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -1055,7 +1088,7 @@ class TransactionsStream(BunnyStream):
 
     query = """
     query Transactions($after: String) {
-        transactions(first: 10, after: $after) {
+        transactions(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -1067,8 +1100,10 @@ class TransactionsStream(BunnyStream):
                 transactionableId
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -1101,7 +1136,7 @@ class TenantsStream(BunnyStream):
 
     query = """
     query Tenants($after: String) {
-        tenants(first: 10, after: $after) {
+        tenants(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -1119,8 +1154,10 @@ class TenantsStream(BunnyStream):
                 utilizationMetrics
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -1162,7 +1199,7 @@ class ContactsStream(BunnyStream):
 
     query = """
     query Contacts($after: String) {
-        contacts(first: 100, after: $after) {
+        contacts(first: 50, after: $after) {
             nodes {
                 id
                 accountId
@@ -1188,8 +1225,10 @@ class ContactsStream(BunnyStream):
                 updatedAt
             }
             pageInfo {
-                hasNextPage
+                startCursor
                 endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }

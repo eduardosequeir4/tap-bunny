@@ -163,24 +163,18 @@ class BunnyStream(GraphQLStream):
         """Return whether incremental sync is enabled.
         
         This property reads the incremental_sync setting from the config.
-        If not specified, it defaults to True.
+        If not specified, it defaults to False to use cursor-based pagination only.
         """
-        return self.config.get("incremental_sync", True)
+        return self.config.get("incremental_sync", False)
 
     def get_starting_replication_key_value(self, context: dict | None) -> str | None:
         """Get starting replication key value based on config."""
-        if self.incremental_sync:
-            # If incremental sync is enabled, use normal behavior
-            return super().get_starting_replication_key_value(context)
-        # If full sync is requested, return None to sync all records
+        # Always return None to perform a full sync using cursor-based pagination
         return None
 
     def get_starting_timestamp(self, context: dict | None) -> datetime | None:
         """Get starting timestamp based on config."""
-        if self.incremental_sync:
-            # If incremental sync is enabled, use start_date from config or state
-            return super().get_starting_timestamp(context)
-        # If full sync is requested, return None to sync all records
+        # Always return None to perform a full sync using cursor-based pagination
         return None
 
     def get_next_page_token(
@@ -202,7 +196,9 @@ class BunnyStream(GraphQLStream):
         """
         try:
             data = response.json()
-            stream_data = data.get("data", {}).get(self.name, {})
+            # Extract the field name based on the stream name
+            field_name = self.name
+            stream_data = data.get("data", {}).get(field_name, {})
             
             # Handle both connection-style and direct node-style responses
             if isinstance(stream_data, dict):
