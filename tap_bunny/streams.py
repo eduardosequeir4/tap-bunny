@@ -955,13 +955,13 @@ class RevenueMovementsStream(BunnyStream):
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("accountId", th.StringType),
-        th.Property("accountName", th.StringType),
         th.Property("currencyId", th.StringType),
         th.Property("date", th.DateTimeType),
+        th.Property("movementType", th.StringType),
+        th.Property("recurringAmount", th.CustomType({"type": ["number", "string", "null"]})),
+        th.Property("totalAmount", th.CustomType({"type": ["number", "string", "null"]})),
         th.Property("usageAmount", th.CustomType({"type": ["number", "string", "null"]})),
         th.Property("usageMovementType", th.StringType),
-        th.Property("recurringAmount", th.CustomType({"type": ["number", "string", "null"]})),
-        th.Property("movementType", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
@@ -971,13 +971,13 @@ class RevenueMovementsStream(BunnyStream):
             nodes {
                 id
                 accountId
-                accountName
                 currencyId
                 date
+                movementType
+                recurringAmount
+                totalAmount
                 usageAmount
                 usageMovementType
-                recurringAmount
-                movementType
             }
             pageInfo {
                 startCursor
