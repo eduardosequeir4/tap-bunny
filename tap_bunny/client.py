@@ -111,6 +111,9 @@ class BunnyAuthenticator(OAuthAuthenticator, metaclass=SingletonMeta):
 class BunnyStream(GraphQLStream):
     """Bunny stream class."""
 
+    # Dictionary to track seen IDs for each stream
+    seen_ids = {}
+
     def _request_with_backoff(self, prepared_request: requests.PreparedRequest, context: dict) -> requests.Response:
         """Execute a request with backoff and token refresh handling.
         
@@ -257,13 +260,13 @@ class BunnyStream(GraphQLStream):
         return variables
 
     def parse_response(self, response: requests.Response) -> t.Generator[dict, None, None]:
-        """Parse the response and yield each record from the source.
+        """Parse the response and yield each record from the source, filtering duplicates.
 
         Args:
             response: HTTP response object
 
         Yields:
-            An iterator for each record from the source.
+            An iterator for each unique record from the source.
 
         Raises:
             RuntimeError: If the response is not valid JSON or contains errors.
@@ -307,8 +310,13 @@ class BunnyStream(GraphQLStream):
             raise RuntimeError("Response data is null")
 
         # Convert stream name from snake_case to camelCase for field lookup
-        field_name = "".join(word.capitalize() for word in self.name.split("_"))
-        field_name = field_name[0].lower() + field_name[1:]  # Make first letter lowercase
+        if "_" in self.name:
+            # Split by underscores and capitalize each part except the first
+            parts = self.name.split("_")
+            field_name = parts[0] + "".join(part.capitalize() for part in parts[1:])
+        else:
+            # If no underscores, just use the name as is
+            field_name = self.name
 
         if field_name not in json_data["data"]:
             available_fields = list(json_data["data"].keys())
@@ -323,7 +331,7 @@ class BunnyStream(GraphQLStream):
         if stream_data is None:
             raise RuntimeError(f"Stream data for '{self.name}' is null")
 
-        # Handle both nodes and edges formats
+        # Get nodes from the response
         if "nodes" in stream_data:
             nodes = stream_data["nodes"]
         elif "edges" in stream_data:
@@ -338,8 +346,22 @@ class BunnyStream(GraphQLStream):
         if nodes is None:
             raise RuntimeError(f"Nodes array is null for stream '{self.name}'")
 
+        # Initialize set for this stream if it doesn't exist
+        if self.name not in self.seen_ids:
+            self.seen_ids[self.name] = set()
+
+        # Filter out duplicates
         for node in nodes:
-            if node is not None:
+            if node is not None and "id" in node:
+                # Skip already seen records
+                if node["id"] in self.seen_ids[self.name]:
+                    continue
+                
+                # Add to seen IDs and yield the record
+                self.seen_ids[self.name].add(node["id"])
+                yield node
+            elif node is not None:
+                # If node doesn't have an ID field, yield it anyway
                 yield node
 
     def post_process(

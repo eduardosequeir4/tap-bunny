@@ -1171,8 +1171,6 @@ class ContactsStream(BunnyStream):
     path = "/graphql"
     primary_keys: t.ClassVar[list[str]] = ["id"]
     replication_key = "updatedAt"
-    # Keep track of seen contact IDs
-    seen_ids = set()
 
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
@@ -1235,95 +1233,3 @@ class ContactsStream(BunnyStream):
         }
     }
     """
-
-    def parse_response(self, response: requests.Response) -> t.Generator[dict, None, None]:
-        """Parse the response and yield each record from the source, filtering duplicates.
-
-        Args:
-            response: HTTP response object
-
-        Yields:
-            An iterator for each unique record from the source.
-
-        Raises:
-            RuntimeError: If the response is not valid JSON or contains errors.
-        """
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"HTTP request failed with status code {response.status_code}: {response.text}"
-            )
-
-        try:
-            json_data = response.json()
-        except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"Failed to parse JSON response: {str(e)}\nResponse text: {response.text[:1000]}"
-            ) from e
-
-        if "errors" in json_data:
-            errors = json_data["errors"]
-            error_msg = "GraphQL errors occurred:\n"
-            for error in errors:
-                error_msg += f"- {error.get('message', 'Unknown error')}\n"
-                if "path" in error:
-                    error_msg += f"  Path: {'.'.join(str(p) for p in error['path'])}\n"
-                if "locations" in error:
-                    error_msg += f"  Locations: {error['locations']}\n"
-                if "extensions" in error:
-                    error_msg += f"  Extensions: {error['extensions']}\n"
-            if "query" in json_data:
-                error_msg += f"\nQuery: {json_data['query']}\n"
-            if "variables" in json_data:
-                error_msg += f"Variables: {json_data['variables']}\n"
-            raise RuntimeError(error_msg)
-
-        if not isinstance(json_data, dict):
-            raise RuntimeError(f"Expected dictionary response, got {type(json_data)}")
-
-        if "data" not in json_data:
-            raise RuntimeError(f"No 'data' field in response: {json_data}")
-
-        if json_data["data"] is None:
-            raise RuntimeError("Response data is null")
-
-        # Use the stream name directly
-        field_name = "contacts"
-
-        if field_name not in json_data["data"]:
-            available_fields = list(json_data["data"].keys())
-            raise RuntimeError(
-                f"No data found for stream '{self.name}' in response\n"
-                f"Available fields: {available_fields}\n"
-                f"Response: {json_data}"
-            )
-
-        stream_data = json_data["data"][field_name]
-
-        if stream_data is None:
-            raise RuntimeError(f"Stream data for '{self.name}' is null")
-
-        # Get nodes from the response
-        if "nodes" in stream_data:
-            nodes = stream_data["nodes"]
-        elif "edges" in stream_data:
-            nodes = [edge["node"] for edge in stream_data["edges"]]
-        else:
-            raise RuntimeError(
-                f"No 'nodes' or 'edges' found in stream data for '{self.name}'\n"
-                f"Available fields: {list(stream_data.keys())}\n"
-                f"Response: {json_data}"
-            )
-
-        if nodes is None:
-            raise RuntimeError(f"Nodes array is null for stream '{self.name}'")
-
-        # Filter out duplicates
-        for node in nodes:
-            if node is not None:
-                # Skip already seen records
-                if node["id"] in self.seen_ids:
-                    continue
-                
-                # Add to seen IDs and yield the record
-                self.seen_ids.add(node["id"])
-                yield node
