@@ -11,7 +11,6 @@ from singer_sdk import typing as th  # JSON Schema typing helpers
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 import requests
 import decimal
-import json
 
 from tap_bunny.client import BunnyStream
 
@@ -33,8 +32,8 @@ class UsersStream(BunnyStream):
     replication_key = "modified"
 
     query = """
-    query Users($after: String) {
-        users(first: 50, after: $after) {
+    query Users($after: String, $sort: String) {
+        users(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 name
@@ -65,8 +64,8 @@ class GroupsStream(BunnyStream):
     replication_key = "modified"
 
     query = """
-    query Groups($after: String) {
-        groups(first: 50, after: $after) {
+    query Groups($after: String, $sort: String) {
+        groups(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 name
@@ -135,8 +134,8 @@ class AccountsStream(BunnyStream):
     replication_key = "createdAt"
 
     query = """
-    query Accounts($after: String) {
-        accounts(first: 50, after: $after) {
+    query Accounts($after: String, $sort: String) {
+        accounts(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountTypeId
@@ -220,8 +219,8 @@ class SubscriptionsStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Subscriptions($after: String) {
-        subscriptions(first: 50, after: $after) {
+    query Subscriptions($after: String, $sort: String) {
+        subscriptions(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -267,8 +266,8 @@ class AccountBalancesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
     query = """
-    query AccountBalances($after: String) {
-        accountBalances(first: 50, after: $after) {
+    query AccountBalances($after: String, $sort: String) {
+        accountBalances(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -333,8 +332,8 @@ class EntitiesStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Entities($after: String) {
-        entities(first: 50, after: $after) {
+    query Entities($after: String, $sort: String) {
+        entities(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 abbreviation
@@ -421,8 +420,8 @@ class InvoicesStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Invoices($after: String) {
-        invoices(first: 50, after: $after) {
+    query Invoices($after: String, $sort: String) {
+        invoices(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -490,8 +489,8 @@ class InvoiceItemsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
     query = """
-    query InvoiceItems($after: String) {
-        invoiceItems(first: 50, after: $after) {
+    query InvoiceItems($after: String, $sort: String) {
+        invoiceItems(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 amount
@@ -548,8 +547,8 @@ class PaymentsStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Payments($after: String) {
-        payments(first: 50, after: $after) {
+    query Payments($after: String, $sort: String) {
+        payments(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -599,8 +598,8 @@ class PaymentMethodsStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query PaymentMethods($after: String) {
-        paymentMethods(first: 50, after: $after) {
+    query PaymentMethods($after: String, $sort: String) {
+        paymentMethods(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -644,8 +643,8 @@ class ProductsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
     query = """
-    query Products($after: String) {
-        products(first: 50, after: $after) {
+    query Products($after: String, $sort: String) {
+        products(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 code
@@ -698,8 +697,8 @@ class PlansStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Plans($after: String) {
-        plans(first: 50, after: $after) {
+    query Plans($after: String, $sort: String) {
+        plans(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 addon
@@ -780,8 +779,8 @@ class QuotesStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Quotes($after: String) {
-        quotes(first: 50, after: $after) {
+    query Quotes($after: String, $sort: String) {
+        quotes(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 acceptedByName
@@ -869,8 +868,8 @@ class QuoteChargesStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query QuoteCharges($after: String) {
-        quoteCharges(first: 50, after: $after) {
+    query QuoteCharges($after: String, $sort: String) {
+        quoteCharges(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 amount
@@ -927,8 +926,8 @@ class RecurringRevenuesStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
     query = """
-    query RecurringRevenues($after: String) {
-        recurringRevenues(first: 50, after: $after) {
+    query RecurringRevenues($after: String, $sort: String) {
+        recurringRevenues(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -967,27 +966,24 @@ class RevenueMovementsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
     query = """
-    query revenueMovements {
-        revenueMovements(first: 26, sort: "date desc") {
-            pageInfo {
-                startCursor
-                endCursor
-                hasNextPage
-                hasPreviousPage
-            }
-            totalCount
+    query RevenueMovements($after: String, $sort: String) {
+        revenueMovements(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
-                account {
-            name
-            id
-                }
+                accountId
+                accountName
                 currencyId
                 date
                 usageAmount
                 usageMovementType
                 recurringAmount
                 movementType
+            }
+            pageInfo {
+                startCursor
+                endCursor
+                hasNextPage
+                hasPreviousPage
             }
         }
     }
@@ -1029,8 +1025,8 @@ class SubscriptionChargesStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query SubscriptionCharges($after: String) {
-        subscriptionCharges(first: 50, after: $after) {
+    query SubscriptionCharges($after: String, $sort: String) {
+        subscriptionCharges(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 amount
@@ -1087,8 +1083,8 @@ class TransactionsStream(BunnyStream):
     replication_key = "createdAt"
 
     query = """
-    query Transactions($after: String) {
-        transactions(first: 50, after: $after) {
+    query Transactions($after: String, $sort: String) {
+        transactions(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -1135,8 +1131,8 @@ class TenantsStream(BunnyStream):
     replication_key = "updatedAt"
 
     query = """
-    query Tenants($after: String) {
-        tenants(first: 50, after: $after) {
+    query Tenants($after: String, $sort: String) {
+        tenants(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -1198,8 +1194,8 @@ class ContactsStream(BunnyStream):
     ).to_dict()
 
     query = """
-    query Contacts($after: String) {
-        contacts(first: 50, after: $after) {
+    query Contacts($after: String, $sort: String) {
+        contacts(first: 50, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
