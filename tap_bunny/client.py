@@ -254,7 +254,7 @@ class BunnyStream(GraphQLStream):
         variables: dict = {}
         if next_page_token:
             variables["after"] = next_page_token
-        # Add sort parameter to all streams
+        # Always use 'id' for sorting to prevent duplicates
         variables["sort"] = "id"
         return variables
 
@@ -360,3 +360,33 @@ class BunnyStream(GraphQLStream):
         """
         # TODO: Delete this method if not needed.
         return row
+
+    def prepare_request(
+        self,
+        context: dict,
+        next_page_token: Optional[Any] = None,
+    ) -> requests.PreparedRequest:
+        """Prepare a request object for this stream.
+        
+        Args:
+            context: Stream sync context
+            next_page_token: Token for retrieving the next page
+            
+        Returns:
+            A prepared request object
+        """
+        request = requests.Request(
+            "POST",
+            self.url_base + self.path,
+            headers=self.http_headers,
+            json={
+                "query": self.query,
+                "variables": self.get_graphql_variables(context, next_page_token),
+            },
+        )
+        
+        # Debug logging to see the request details
+        self.logger.info(f"GraphQL Query for {self.name}: {self.query}")
+        self.logger.info(f"GraphQL Variables for {self.name}: {self.get_graphql_variables(context, next_page_token)}")
+        
+        return request.prepare()

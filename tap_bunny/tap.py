@@ -14,8 +14,23 @@ from typing import Dict
 
 STREAM_TYPES = [
     streams.AccountsStream,
-    streams.ContactsStream,
     streams.SubscriptionsStream,
+    streams.ContactsStream,
+    streams.AccountBalancesStream,
+    streams.EntitiesStream,
+    streams.InvoicesStream,
+    streams.InvoiceItemsStream,
+    streams.PaymentsStream,
+    streams.PaymentMethodsStream,
+    streams.ProductsStream,
+    streams.PlansStream,
+    streams.QuotesStream,
+    streams.QuoteChargesStream,
+    streams.RecurringRevenuesStream,
+    streams.RevenueMovementsStream,
+    streams.SubscriptionChargesStream,
+    streams.TransactionsStream,
+    streams.TenantsStream,
 ]
 
 class TapBunny(Tap):
@@ -24,7 +39,6 @@ class TapBunny(Tap):
     name = "tap-bunny"
     tap_name = "tap-bunny"
 
-    # TODO: Update this section with the actual config values you expect:
     config_jsonschema = th.PropertiesList(
         th.Property(
             "client_id",

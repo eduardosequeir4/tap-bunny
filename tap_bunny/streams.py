@@ -33,7 +33,7 @@ class UsersStream(BunnyStream):
 
     query = """
     query Users($after: String, $sort: String) {
-        users(first: 50, after: $after, sort: $sort) {
+        users(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 name
@@ -65,7 +65,7 @@ class GroupsStream(BunnyStream):
 
     query = """
     query Groups($after: String, $sort: String) {
-        groups(first: 50, after: $after, sort: $sort) {
+        groups(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 name
@@ -135,7 +135,7 @@ class AccountsStream(BunnyStream):
 
     query = """
     query Accounts($after: String, $sort: String) {
-        accounts(first: 50, after: $after, sort: $sort) {
+        accounts(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountTypeId
@@ -220,7 +220,7 @@ class SubscriptionsStream(BunnyStream):
 
     query = """
     query Subscriptions($after: String, $sort: String) {
-        subscriptions(first: 50, after: $after, sort: $sort) {
+        subscriptions(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -267,7 +267,7 @@ class AccountBalancesStream(BunnyStream):
 
     query = """
     query AccountBalances($after: String, $sort: String) {
-        accountBalances(first: 50, after: $after, sort: $sort) {
+        accountBalances(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -333,7 +333,7 @@ class EntitiesStream(BunnyStream):
 
     query = """
     query Entities($after: String, $sort: String) {
-        entities(first: 50, after: $after, sort: $sort) {
+        entities(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 abbreviation
@@ -421,7 +421,7 @@ class InvoicesStream(BunnyStream):
 
     query = """
     query Invoices($after: String, $sort: String) {
-        invoices(first: 50, after: $after, sort: $sort) {
+        invoices(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -490,7 +490,7 @@ class InvoiceItemsStream(BunnyStream):
 
     query = """
     query InvoiceItems($after: String, $sort: String) {
-        invoiceItems(first: 50, after: $after, sort: $sort) {
+        invoiceItems(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 amount
@@ -548,7 +548,7 @@ class PaymentsStream(BunnyStream):
 
     query = """
     query Payments($after: String, $sort: String) {
-        payments(first: 50, after: $after, sort: $sort) {
+        payments(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -599,7 +599,7 @@ class PaymentMethodsStream(BunnyStream):
 
     query = """
     query PaymentMethods($after: String, $sort: String) {
-        paymentMethods(first: 50, after: $after, sort: $sort) {
+        paymentMethods(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -644,7 +644,7 @@ class ProductsStream(BunnyStream):
 
     query = """
     query Products($after: String, $sort: String) {
-        products(first: 50, after: $after, sort: $sort) {
+        products(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 code
@@ -698,7 +698,7 @@ class PlansStream(BunnyStream):
 
     query = """
     query Plans($after: String, $sort: String) {
-        plans(first: 50, after: $after, sort: $sort) {
+        plans(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 addon
@@ -780,7 +780,7 @@ class QuotesStream(BunnyStream):
 
     query = """
     query Quotes($after: String, $sort: String) {
-        quotes(first: 50, after: $after, sort: $sort) {
+        quotes(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 acceptedByName
@@ -869,7 +869,7 @@ class QuoteChargesStream(BunnyStream):
 
     query = """
     query QuoteCharges($after: String, $sort: String) {
-        quoteCharges(first: 50, after: $after, sort: $sort) {
+        quoteCharges(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 amount
@@ -927,7 +927,7 @@ class RecurringRevenuesStream(BunnyStream):
 
     query = """
     query RecurringRevenues($after: String, $sort: String) {
-        recurringRevenues(first: 50, after: $after, sort: $sort) {
+        recurringRevenues(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -967,7 +967,7 @@ class RevenueMovementsStream(BunnyStream):
 
     query = """
     query RevenueMovements($after: String, $sort: String) {
-        revenueMovements(first: 50, after: $after, sort: $sort) {
+        revenueMovements(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -1026,7 +1026,7 @@ class SubscriptionChargesStream(BunnyStream):
 
     query = """
     query SubscriptionCharges($after: String, $sort: String) {
-        subscriptionCharges(first: 50, after: $after, sort: $sort) {
+        subscriptionCharges(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 amount
@@ -1084,7 +1084,7 @@ class TransactionsStream(BunnyStream):
 
     query = """
     query Transactions($after: String, $sort: String) {
-        transactions(first: 50, after: $after, sort: $sort) {
+        transactions(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -1132,7 +1132,7 @@ class TenantsStream(BunnyStream):
 
     query = """
     query Tenants($after: String, $sort: String) {
-        tenants(first: 50, after: $after, sort: $sort) {
+        tenants(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
@@ -1195,7 +1195,7 @@ class ContactsStream(BunnyStream):
 
     query = """
     query Contacts($after: String, $sort: String) {
-        contacts(first: 50, after: $after, sort: $sort) {
+        contacts(first: 100, after: $after, sort: $sort) {
             nodes {
                 id
                 accountId
