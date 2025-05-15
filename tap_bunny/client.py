@@ -196,18 +196,29 @@ class BunnyStream(GraphQLStream):
         """
         try:
             data = response.json()
-            # Extract the field name based on the stream name
-            field_name = self.name
+            # Nome do campo conforme camelCase
+            field_name = "".join(word.capitalize() for word in self.name.split("_"))
+            field_name = field_name[0].lower() + field_name[1:]
             stream_data = data.get("data", {}).get(field_name, {})
-            
-            # Handle both connection-style and direct node-style responses
-            if isinstance(stream_data, dict):
-                page_info = stream_data.get("pageInfo", {})
-                if page_info and page_info.get("hasNextPage"):
-                    return page_info.get("endCursor")
-                    
+
+            # nodes pode estar em nodes ou edges
+            if "nodes" in stream_data:
+                nodes = stream_data["nodes"]
+            elif "edges" in stream_data:
+                nodes = [edge["node"] for edge in stream_data["edges"]]
+            else:
+                nodes = []
+
+            page_info = stream_data.get("pageInfo", {})
+            has_next = page_info.get("hasNextPage")
+            end_cursor = page_info.get("endCursor")
+
+            # Dupla validação: se hasNextPage ou se nodes == 100
+            if (has_next or (nodes and len(nodes) == 100)) and end_cursor:
+                return end_cursor
+
             return None
-            
+
         except Exception as e:
             self.logger.error(f"Error parsing pagination info: {str(e)}")
             return None
