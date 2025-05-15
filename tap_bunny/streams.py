@@ -29,7 +29,6 @@ class UsersStream(BunnyStream):
         th.Property("modified", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "modified"
 
     query = """
     query Users($after: String, $sort: String) {
@@ -61,7 +60,6 @@ class GroupsStream(BunnyStream):
         th.Property("modified", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "modified"
 
     query = """
     query Groups($after: String, $sort: String) {
@@ -131,7 +129,6 @@ class AccountsStream(BunnyStream):
         th.Property("website", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "createdAt"
 
     query = """
     query Accounts($after: String, $sort: String) {
@@ -216,7 +213,6 @@ class SubscriptionsStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Subscriptions($after: String, $sort: String) {
@@ -329,7 +325,6 @@ class EntitiesStream(BunnyStream):
         th.Property("website", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Entities($after: String, $sort: String) {
@@ -417,7 +412,6 @@ class InvoicesStream(BunnyStream):
         th.Property("uuid", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Invoices($after: String, $sort: String) {
@@ -544,7 +538,6 @@ class PaymentsStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Payments($after: String, $sort: String) {
@@ -595,7 +588,6 @@ class PaymentMethodsStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query PaymentMethods($after: String, $sort: String) {
@@ -694,7 +686,6 @@ class PlansStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Plans($after: String, $sort: String) {
@@ -776,7 +767,6 @@ class QuotesStream(BunnyStream):
         th.Property("uuid", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Quotes($after: String, $sort: String) {
@@ -865,7 +855,6 @@ class QuoteChargesStream(BunnyStream):
         th.Property("vatCode", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query QuoteCharges($after: String, $sort: String) {
@@ -1022,7 +1011,6 @@ class SubscriptionChargesStream(BunnyStream):
         th.Property("updatedAt", th.DateTimeType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query SubscriptionCharges($after: String, $sort: String) {
@@ -1080,7 +1068,6 @@ class TransactionsStream(BunnyStream):
         th.Property("transactionableId", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "createdAt"
 
     query = """
     query Transactions($after: String, $sort: String) {
@@ -1128,7 +1115,6 @@ class TenantsStream(BunnyStream):
         th.Property("utilizationMetrics", th.StringType),
     ).to_dict()
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     query = """
     query Tenants($after: String, $sort: String) {
@@ -1166,7 +1152,6 @@ class ContactsStream(BunnyStream):
     name = "contacts"
     path = "/graphql"
     primary_keys: t.ClassVar[list[str]] = ["id"]
-    replication_key = "updatedAt"
 
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
