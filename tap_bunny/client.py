@@ -277,6 +277,8 @@ class BunnyStream(GraphQLStream):
 
         try:
             json_data = response.json()
+            # Log the first API response for each stream
+            self.logger.info(f"First API response for {self.name} stream: {json.dumps(json_data, indent=2)}")
         except json.JSONDecodeError as e:
             raise RuntimeError(
                 f"Failed to parse JSON response: {str(e)}\nResponse text: {response.text[:1000]}"

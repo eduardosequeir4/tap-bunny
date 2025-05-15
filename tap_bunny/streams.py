@@ -45,9 +45,9 @@ class UsersStream(BunnyStream):
                 hasNextPage
                 hasPreviousPage
             }
+            }
         }
-    }
-    """
+        """
 
 
 class GroupsStream(BunnyStream):
@@ -1227,5 +1227,5 @@ class ContactsStream(BunnyStream):
                 hasPreviousPage
             }
         }
-    }
-    """
+        }
+        """
