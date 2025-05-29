@@ -733,7 +733,6 @@ class QuotesStream(BunnyStream):
         th.Property("acceptedByTitle", th.StringType),
         th.Property("accountId", th.StringType),
         th.Property("amount", th.CustomType({"type": ["number", "string", "null"]})),
-        #th.Property("amountDue", th.CustomType({"type": ["number", "string", "null"]})),
         th.Property("applicationDate", th.DateTimeType),
         th.Property("backdatedPeriods", th.CustomType({"type": ["boolean", "null"]})),
         th.Property("backdatedQuote", th.BooleanType),
