@@ -250,10 +250,7 @@ class BunnyStream(GraphQLStream):
         context: Optional[dict],
         next_page_token: Optional[Any],
     ) -> Dict[str, Any]:
-        """Return a dictionary of values to be used as GraphQL variables.
-        
-        This method standardizes the GraphQL variables across all streams.
-        It handles pagination by providing the 'after' cursor when available.
+        """Return a dictionary of values to be used in GraphQL variables.
         
         Args:
             context: The stream context
@@ -263,99 +260,54 @@ class BunnyStream(GraphQLStream):
             A dictionary of GraphQL variables
         """
         variables: dict = {}
+        
+        # Add pagination variables
         if next_page_token:
             variables["after"] = next_page_token
-        # Always use 'id' for sorting to prevent duplicates
-        variables["sort"] = "id"
+            variables["first"] = 100
+        else:
+            variables["first"] = 100
+            
+        # Add sort variable if specified in config
+        if "sort" in self.config:
+            variables["sort"] = self.config["sort"]
+            
+        # Add filter variable if specified in config
+        if "filter" in self.config:
+            variables["filter"] = self.config["filter"]
+            
         return variables
 
     def parse_response(self, response: requests.Response) -> t.Generator[dict, None, None]:
-        """Parse the response and yield each record from the source.
-
+        """Parse the response and return an iterator of result rows.
+        
         Args:
-            response: HTTP response object
-
+            response: The HTTP response object
+            
         Yields:
-            An iterator for each record from the source.
-
-        Raises:
-            RuntimeError: If the response is not valid JSON or contains errors.
+            Each record from the response
         """
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"HTTP request failed with status code {response.status_code}: {response.text}"
-            )
-
         try:
-            json_data = response.json()
-            # Log the first API response for each stream
-            self.logger.info(f"First API response for {self.name} stream: {json.dumps(json_data, indent=2)}")
-        except json.JSONDecodeError as e:
-            raise RuntimeError(
-                f"Failed to parse JSON response: {str(e)}\nResponse text: {response.text[:1000]}"
-            ) from e
+            data = response.json()
+            # Convert stream name to camelCase for GraphQL field name
+            field_name = "".join(word.capitalize() for word in self.name.split("_"))
+            field_name = field_name[0].lower() + field_name[1:]
+            stream_data = data.get("data", {}).get(field_name, {})
 
-        if "errors" in json_data:
-            errors = json_data["errors"]
-            error_msg = "GraphQL errors occurred:\n"
-            for error in errors:
-                error_msg += f"- {error.get('message', 'Unknown error')}\n"
-                if "path" in error:
-                    error_msg += f"  Path: {'.'.join(str(p) for p in error['path'])}\n"
-                if "locations" in error:
-                    error_msg += f"  Locations: {error['locations']}\n"
-                if "extensions" in error:
-                    error_msg += f"  Extensions: {error['extensions']}\n"
-            if "query" in json_data:
-                error_msg += f"\nQuery: {json_data['query']}\n"
-            if "variables" in json_data:
-                error_msg += f"Variables: {json_data['variables']}\n"
-            raise RuntimeError(error_msg)
+            # Handle both nodes and edges-based pagination
+            if "nodes" in stream_data:
+                nodes = stream_data["nodes"]
+            elif "edges" in stream_data:
+                nodes = [edge["node"] for edge in stream_data["edges"]]
+            else:
+                nodes = []
 
-        if not isinstance(json_data, dict):
-            raise RuntimeError(f"Expected dictionary response, got {type(json_data)}")
+            for record in nodes:
+                yield record
 
-        if "data" not in json_data:
-            raise RuntimeError(f"No 'data' field in response: {json_data}")
-
-        if json_data["data"] is None:
-            raise RuntimeError("Response data is null")
-
-        # Convert stream name from snake_case to camelCase for field lookup
-        field_name = "".join(word.capitalize() for word in self.name.split("_"))
-        field_name = field_name[0].lower() + field_name[1:]  # Make first letter lowercase
-
-        if field_name not in json_data["data"]:
-            available_fields = list(json_data["data"].keys())
-            raise RuntimeError(
-                f"No data found for stream '{self.name}' in response\n"
-                f"Available fields: {available_fields}\n"
-                f"Response: {json_data}"
-            )
-
-        stream_data = json_data["data"][field_name]
-
-        if stream_data is None:
-            raise RuntimeError(f"Stream data for '{self.name}' is null")
-
-        # Handle both nodes and edges formats
-        if "nodes" in stream_data:
-            nodes = stream_data["nodes"]
-        elif "edges" in stream_data:
-            nodes = [edge["node"] for edge in stream_data["edges"]]
-        else:
-            raise RuntimeError(
-                f"No 'nodes' or 'edges' found in stream data for '{self.name}'\n"
-                f"Available fields: {list(stream_data.keys())}\n"
-                f"Response: {json_data}"
-            )
-
-        if nodes is None:
-            raise RuntimeError(f"Nodes array is null for stream '{self.name}'")
-
-        for node in nodes:
-            if node is not None:
-                yield node
+        except Exception as e:
+            self.logger.error(f"Error parsing response: {str(e)}")
+            raise
 
     def post_process(
         self,

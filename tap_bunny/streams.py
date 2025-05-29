@@ -590,21 +590,25 @@ class PaymentMethodsStream(BunnyStream):
     primary_keys: t.ClassVar[list[str]] = ["id"]
 
     query = """
-    query PaymentMethods($after: String, $sort: String) {
-        paymentMethods(first: 100, after: $after, sort: $sort) {
-            nodes {
-                id
-                accountId
-                createdAt
-                disabled
-                expirationDate
-                failureCode
-                lastSuccess
-                paymentType
-                pluginId
-                state
-                updatedAt
+    query PaymentMethods($after: String, $before: String, $first: Int, $last: Int, $filter: String, $sort: String) {
+        paymentMethods(after: $after, before: $before, first: $first, last: $last, filter: $filter, sort: $sort) {
+            edges {
+                cursor
+                node {
+                    accountId
+                    createdAt
+                    disabled
+                    expirationDate
+                    failureCode
+                    id
+                    lastSuccess
+                    pluginId
+                    updatedAt
+                    paymentType
+                    state
+                }
             }
+            totalCount
             pageInfo {
                 startCursor
                 endCursor
