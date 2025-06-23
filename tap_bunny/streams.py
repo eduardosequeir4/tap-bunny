@@ -1217,3 +1217,103 @@ class ContactsStream(BunnyStream):
         }
         }
         """
+
+
+class FeatureUsagesStream(BunnyStream):
+    """Define custom stream."""
+
+    name = "feature_usages"
+    path = "/graphql"
+    schema = th.PropertiesList(
+        th.Property("id", th.StringType),
+        th.Property("accountId", th.StringType),
+        th.Property("createdAt", th.DateTimeType),
+        th.Property("featureId", th.StringType),
+        th.Property("quantity", th.CustomType({"type": ["number", "string", "null"]})),
+        th.Property("subscriptionChargeId", th.StringType),
+        th.Property("subscriptionId", th.StringType),
+        th.Property("updatedAt", th.DateTimeType),
+        th.Property("usageAt", th.DateTimeType),
+    ).to_dict()
+    primary_keys: t.ClassVar[list[str]] = ["id"]
+
+    query = """
+    query FeatureUsages($after: String, $before: String, $first: Int, $last: Int, $filter: String, $sort: String, $viewId: ID, $format: String) {
+        featureUsages(after: $after, before: $before, first: $first, last: $last, filter: $filter, sort: $sort, viewId: $viewId, format: $format) {
+            edges {
+                cursor
+                node {
+                    accountId
+                    createdAt
+                    featureId
+                    id
+                    quantity
+                    subscriptionChargeId
+                    subscriptionId
+                    updatedAt
+                    usageAt
+                }
+            }
+            totalCount
+            pageInfo {
+                startCursor
+                endCursor
+                hasNextPage
+                hasPreviousPage
+            }
+        }
+    }
+    """
+
+
+class FeaturesStream(BunnyStream):
+    """Define custom stream."""
+
+    name = "features"
+    path = "/graphql"
+    schema = th.PropertiesList(
+        th.Property("id", th.StringType),
+        th.Property("code", th.StringType),
+        th.Property("createdAt", th.DateTimeType),
+        th.Property("description", th.StringType),
+        th.Property("isProvisioned", th.BooleanType),
+        th.Property("isUnit", th.BooleanType),
+        th.Property("isVisible", th.BooleanType),
+        th.Property("name", th.StringType),
+        th.Property("position", th.IntegerType),
+        th.Property("productId", th.StringType),
+        th.Property("unitName", th.StringType),
+        th.Property("updatedAt", th.DateTimeType),
+    ).to_dict()
+    primary_keys: t.ClassVar[list[str]] = ["id"]
+
+    query = """
+    query Features($after: String, $before: String, $first: Int, $last: Int, $filter: String, $sort: String, $viewId: ID, $format: String) {
+        features(after: $after, before: $before, first: $first, last: $last, filter: $filter, sort: $sort, viewId: $viewId, format: $format) {
+            edges {
+                cursor
+                node {
+                    code
+                    createdAt
+                    description
+                    id
+                    isProvisioned
+                    isUnit
+                    isVisible
+                    name
+                    position
+                    productId
+                    unitName
+                    updatedAt
+                }
+            }
+            totalCount
+            pageInfo {
+                startCursor
+                endCursor
+                hasNextPage
+                hasPreviousPage
+            }
+        }
+    }
+    """

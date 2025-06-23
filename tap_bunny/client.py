@@ -278,6 +278,14 @@ class BunnyStream(GraphQLStream):
         if "filter" in self.config:
             variables["filter"] = self.config["filter"]
             
+        # Add viewId variable if specified in config
+        if "viewId" in self.config:
+            variables["viewId"] = self.config["viewId"]
+            
+        # Add format variable if specified in config
+        if "format" in self.config:
+            variables["format"] = self.config["format"]
+            
         return variables
 
     def parse_response(self, response: requests.Response) -> t.Generator[dict, None, None]:
